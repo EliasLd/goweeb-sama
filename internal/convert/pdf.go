@@ -10,7 +10,7 @@ import (
 	"github.com/signintech/gopdf"
 )
 
-func ImagesToPDF(imagesDir, outputPDFPath string) error {
+func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 	files, err := os.ReadDir(imagesDir)
 	if err != nil {
 		return fmt.Errorf("Failed to read image dir: %v", err)
@@ -49,5 +49,14 @@ func ImagesToPDF(imagesDir, outputPDFPath string) error {
 	}
 
 	fmt.Printf("PDF generated at: %s\n",outputPDFPath)
+
+	if cleanup {
+		fmt.Printf("Cleaning up directory: %s\n", imagesDir)
+		err := os.RemoveAll(imagesDir)
+		if err != nil {
+			return fmt.Errorf("Failed to remove temp dir: %w", err)
+		}
+	}
+
 	return nil
 }
