@@ -3,6 +3,8 @@ package convert
 import (
 	"fmt"
 	"os"
+	"image"
+	_ "image/jpeg"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -30,14 +32,32 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 	sort.Strings(imageFiles)
 
 	pdf := gopdf.GoPdf{}
-	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
+	pdf.Start(gopdf.Config{})
+
 
 	for _, imageName := range imageFiles {
 		imagePath := filepath.Join(imagesDir, imageName)
 
-		pdf.AddPage()
+		imageFile, err := os.Open(imagePath)
+		if err != nil {
+			return fmt.Errorf("Failed to open image %s: %w", imageName, err)
+		}
 
-		err := pdf.Image(imagePath, 0, 0, nil)
+		imageConfig, _, err := image.DecodeConfig(imageFile)
+		imageFile.Close()
+		if err != nil {
+			return fmt.Errorf("Failed to decode image %s: %w", imageName, err)
+		}
+
+		width := float64(imageConfig.Width)
+		height := float64(imageConfig.Height)
+
+		// Start a new page with exact dimensions
+		pdf.AddPageWithOption(gopdf.PageOption{
+			PageSize: &gopdf.Rect{W: width, H: height},
+		})
+
+		err = pdf.Image(imagePath, 0, 0, &gopdf.Rect{W: width, H: height})
 		if err != nil {
 			return fmt.Errorf("Error adding image %s: %w", imageName, err)
 		}
