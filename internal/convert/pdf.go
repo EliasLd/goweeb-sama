@@ -4,13 +4,63 @@ import (
 	"fmt"
 	"os"
 	"image"
-	_ "image/jpeg"
+	"image/jpeg"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/signintech/gopdf"
+	"golang.org/x/image/webp"
 )
+
+// Opens the file at path and checks
+// if it is encoded in WEBP format
+func IsWebP(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	header := make([]byte, 12)
+	_, err = f.Read(header)
+	if err != nil {
+		return false, err
+	}
+
+	if string(header[0:4]) == "RIFF" && string(header[8:12]) == "WEBP" {
+		return true, nil
+	}
+	return false, nil
+}
+
+// Converts a WebP image in the jpg format
+func WebPToJPG(srcPath, destPath string) error {
+	f, err := os.Open(srcPath)
+	if err != nil {
+		return fmt.Errorf("Failed to open WebP file: %w", err)
+	}
+	defer f.Close()
+
+	img, err := webp.Decode(f)
+	if err != nil {
+		return fmt.Errorf("Failed to decode WebP image: %w", err)
+	}
+
+	out, err := os.Create(destPath)
+	if err != nil {
+		return fmt.Errorf("Failed to create JPEG file: %w", err)
+	}
+	defer out.Close()
+
+	// Encode image into JPEG format
+	opt := jpeg.Options{Quality: 90}
+	if err := jpeg.Encode(out, img, &opt); err != nil {
+		return fmt.Errorf("Failed to encode JPEG: %w", err)
+	}
+
+	return nil
+}
 
 func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 	files, err := os.ReadDir(imagesDir)
