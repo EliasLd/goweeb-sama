@@ -4,13 +4,63 @@ import (
 	"fmt"
 	"os"
 	"image"
-	_ "image/jpeg"
+	"image/jpeg"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/signintech/gopdf"
+	"golang.org/x/image/webp"
 )
+
+// Opens the file at path and checks
+// if it is encoded in WEBP format
+func IsWebP(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	header := make([]byte, 12)
+	_, err = f.Read(header)
+	if err != nil {
+		return false, err
+	}
+
+	if string(header[0:4]) == "RIFF" && string(header[8:12]) == "WEBP" {
+		return true, nil
+	}
+	return false, nil
+}
+
+// Converts a WebP image in the jpg format
+func WebPToJPG(srcPath, destPath string) error {
+	f, err := os.Open(srcPath)
+	if err != nil {
+		return fmt.Errorf("Failed to open WebP file: %w", err)
+	}
+	defer f.Close()
+
+	img, err := webp.Decode(f)
+	if err != nil {
+		return fmt.Errorf("Failed to decode WebP image: %w", err)
+	}
+
+	out, err := os.Create(destPath)
+	if err != nil {
+		return fmt.Errorf("Failed to create JPEG file: %w", err)
+	}
+	defer out.Close()
+
+	// Encode image into JPEG format
+	opt := jpeg.Options{Quality: 90}
+	if err := jpeg.Encode(out, img, &opt); err != nil {
+		return fmt.Errorf("Failed to encode JPEG: %w", err)
+	}
+
+	return nil
+}
 
 func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 	files, err := os.ReadDir(imagesDir)
@@ -19,8 +69,13 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 	}
 	
 	var imageFiles []string
-	for _, f := range files {	
-		if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".jpg") {
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+
+		ext := strings.ToLower(filepath.Ext(f.Name()))
+		if ext == ".jpg" || ext == ".jpeg" || ext == ".webp" {
 			imageFiles = append(imageFiles, f.Name())
 		}
 	}
@@ -37,6 +92,22 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 
 	for _, imageName := range imageFiles {
 		imagePath := filepath.Join(imagesDir, imageName)
+		lower := strings.ToLower(imageName)
+
+		// Handle .webp
+		if strings.HasSuffix(lower, ".webp") || strings.HasSuffix(lower, ".jpg") {
+			isWebP, err := IsWebP(imagePath)
+			if err != nil {
+				fmt.Errorf("Failed to check whether %s is WebP: %v", imagePath, err)
+			}
+			if isWebP {
+				err := WebPToJPG(imagePath, imagePath)
+				if err != nil {
+					fmt.Printf("Failed to convert WebP: %v\n", err)
+					continue
+				}
+			}
+		}
 
 		imageFile, err := os.Open(imagePath)
 		if err != nil {
