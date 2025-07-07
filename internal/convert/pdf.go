@@ -69,8 +69,13 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 	}
 	
 	var imageFiles []string
-	for _, f := range files {	
-		if !f.IsDir() && strings.HasSuffix(strings.ToLower(f.Name()), ".jpg") {
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+
+		ext := strings.ToLower(filepath.Ext(f.Name()))
+		if ext == ".jpg" || ext == ".jpeg" || ext == ".webp" {
 			imageFiles = append(imageFiles, f.Name())
 		}
 	}
@@ -87,6 +92,22 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 
 	for _, imageName := range imageFiles {
 		imagePath := filepath.Join(imagesDir, imageName)
+		lower := strings.ToLower(imageName)
+
+		// Handle .webp
+		if strings.HasSuffix(lower, ".webp") || strings.HasSuffix(lower, ".jpg") {
+			isWebP, err := IsWebP(imagePath)
+			if err != nil {
+				fmt.Errorf("Failed to check whether %s is WebP: %v", imagePath, err)
+			}
+			if isWebP {
+				err := WebPToJPG(imagePath, imagePath)
+				if err != nil {
+					fmt.Printf("Failed to convert WebP: %v\n", err)
+					continue
+				}
+			}
+		}
 
 		imageFile, err := os.Open(imagePath)
 		if err != nil {
