@@ -115,9 +115,13 @@ func main() {
 
 		for _, chapter := range chapters {
 			fmt.Printf("Downloading chapter %s...\n", chapter)
-
-			imageDir := fmt.Sprintf("/home/guts/Images/%s/%s", opts.Slug, chapter)
-			err := fetch.DownloadChapter(opts.Slug, chapter, imageDir)
+			
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				log.Fatalf("Failed to get user home directory: %v", err)
+			}
+			imageDir := fmt.Sprintf("%s/Images/%s/%s", homeDir, opts.Slug, chapter)
+			err = fetch.DownloadChapter(opts.Slug, chapter, imageDir)
 			if err != nil {
 				log.Printf("Failed to download chapter %s: %v", chapter, err)
 				continue
