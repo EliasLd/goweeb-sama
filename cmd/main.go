@@ -17,7 +17,7 @@ type Options struct {
 	All	bool
 	Range	[2]int
 	ScanDir	string
-	Cleanup	bool
+	Cleanup bool
 }
 
 func ParseFlags() Options {
@@ -32,8 +32,9 @@ func ParseFlags() Options {
 	flag.StringVar(&scanDir, "scan-dir", "pdf", "Directory to save the generated PDF files")
 	flag.StringVar(&scanDir, "d", "pdf", "Shorthand for --scan-dir")
 
-	cleanupFlag := flag.Bool("cleanup", false, "Delete images after PDF creation")
-	cleanupShort := flag.Bool("c", false, "Delete images after PDF creation (shorthand)")
+	keepImagesFlag := flag.Bool("keep-images", false, "Keep images after PDF creation")
+	keepImagesShort := flag.Bool("k", false, "Shorthand for --keep-images")
+
 
 	flag.Parse()
 
@@ -49,7 +50,7 @@ func ParseFlags() Options {
 	// Resolve final values
 	all := *allFlag || *allShort
 	dir := scanDir
-	cleanup := *cleanupFlag || *cleanupShort
+	keepImages := *keepImagesFlag || *keepImagesShort
 
 	// Parse chapters range
 	rangeStr := *rangeFlag
@@ -83,7 +84,7 @@ func ParseFlags() Options {
 		All:	all,
 		Range:	chapterRange,
 		ScanDir:dir,
-		Cleanup:cleanup,
+		Cleanup:!keepImages,
 	}
 }
 
