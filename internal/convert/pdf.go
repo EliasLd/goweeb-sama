@@ -141,13 +141,5 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 
 	fmt.Printf("PDF generated at: %s\n",outputPDFPath)
 
-	if cleanup {
-		fmt.Printf("Cleaning up directory: %s\n", imagesDir)
-		err := os.RemoveAll(imagesDir)
-		if err != nil {
-			return fmt.Errorf("Failed to remove temp dir: %w", err)
-		}
-	}
-
 	return nil
 }

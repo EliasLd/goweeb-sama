@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/EliasLd/scan-scraper/internal/fetch"
 	"github.com/EliasLd/scan-scraper/internal/convert"
@@ -16,7 +17,7 @@ type Options struct {
 	All	bool
 	Range	[2]int
 	ScanDir	string
-	Cleanup	bool
+	Cleanup bool
 }
 
 func ParseFlags() Options {
@@ -31,8 +32,9 @@ func ParseFlags() Options {
 	flag.StringVar(&scanDir, "scan-dir", "pdf", "Directory to save the generated PDF files")
 	flag.StringVar(&scanDir, "d", "pdf", "Shorthand for --scan-dir")
 
-	cleanupFlag := flag.Bool("cleanup", false, "Delete images after PDF creation")
-	cleanupShort := flag.Bool("c", false, "Delete images after PDF creation (shorthand)")
+	keepImagesFlag := flag.Bool("keep-images", false, "Keep images after PDF creation")
+	keepImagesShort := flag.Bool("k", false, "Shorthand for --keep-images")
+
 
 	flag.Parse()
 
@@ -48,7 +50,7 @@ func ParseFlags() Options {
 	// Resolve final values
 	all := *allFlag || *allShort
 	dir := scanDir
-	cleanup := *cleanupFlag || *cleanupShort
+	keepImages := *keepImagesFlag || *keepImagesShort
 
 	// Parse chapters range
 	rangeStr := *rangeFlag
@@ -82,7 +84,7 @@ func ParseFlags() Options {
 		All:	all,
 		Range:	chapterRange,
 		ScanDir:dir,
-		Cleanup:cleanup,
+		Cleanup:!keepImages,
 	}
 }
 
@@ -113,21 +115,22 @@ func main() {
 			fmt.Printf("Filtered to %d chapters from range %d-%d.\n", len(chapters), opts.Range[0], opts.Range[1])
 		}
 
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			log.Fatalf("Failed to get user home directory: %v", err)
+		}
+
 		for _, chapter := range chapters {
 			fmt.Printf("Downloading chapter %s...\n", chapter)
-			
-			homeDir, err := os.UserHomeDir()
-			if err != nil {
-				log.Fatalf("Failed to get user home directory: %v", err)
-			}
-			imageDir := fmt.Sprintf("%s/Images/%s/%s", homeDir, opts.Slug, chapter)
+
+			imageDir := filepath.Join(homeDir, "Images", opts.Slug, chapter) 
 			err = fetch.DownloadChapter(opts.Slug, chapter, imageDir)
 			if err != nil {
 				log.Printf("Failed to download chapter %s: %v", chapter, err)
 				continue
 			}
 
-			pdfPath := fmt.Sprintf("%s/%s_%s.pdf", opts.ScanDir, opts.Slug, chapter)
+			pdfPath := filepath.Join(opts.ScanDir, fmt.Sprintf("%s_%s.pdf", opts.Slug, chapter))
 			err = convert.ImagesToPDF(imageDir, pdfPath, opts.Cleanup)
 			if err != nil {
 				log.Printf("Failed to create PDF for chapter %s: %v\n", chapter, err)
@@ -136,6 +139,16 @@ func main() {
 
 			fmt.Printf("Chapter %s downloaded and saved as %s\n", chapter, pdfPath)
 		}
+
+		if opts.Cleanup {
+			rootImagesDir := filepath.Join(homeDir, "Images", opts.Slug)
+			fmt.Printf("Cleaning up images directory: %s\n", rootImagesDir)
+			err := os.RemoveAll(rootImagesDir)
+			if err != nil {
+				log.Fatalf("Failed to remove dir: %w", err)
+			}
+		}
+
 	} else {
 		fmt.Println("Please use --all or --range to download chapters.")
 	}
