@@ -10,16 +10,7 @@ import (
 	"github.com/EliasLd/scan-scraper/internal/convert"
 )
 
-// Holds parsed CLI arguments
-type Options struct {
-	Slug	string
-	All	bool
-	Range	[2]int
-	ScanDir	string
-	Cleanup bool
-}
-
-func Run(opts Options) {
+func Run() {
 	opts := ParseFlags()
 
 	if !opts.All && opts.Range == [2]int{} {
