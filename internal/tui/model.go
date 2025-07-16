@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"io"
+
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -24,6 +26,11 @@ type Model struct {
 	Cursor		int
 	Width		int
 	Height		int
+	DownloadReady	bool
+	IsDownloading	bool
+	Logs		[]string
+	pipeReader	*io.PipeReader
+	pipeWriter	*io.PipeWriter
 }
 
 func InitialModel() Model {
@@ -54,6 +61,9 @@ func InitialModel() Model {
 		Cursor:		0,
 		Width:		0,
 		Height:		0,
+		DownloadReady:	false,
+		IsDownloading:	false,
+		Logs:		[]string{},
 	}
 }
 
