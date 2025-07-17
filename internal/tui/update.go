@@ -1,6 +1,12 @@
 package tui
 
 import (
+	"fmt"
+	"io"
+	"bufio"
+	"strings"
+	app "github.com/EliasLd/scan-scraper/internal/app"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -37,6 +43,27 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 				m.AllCheckbox.Toggle()
 			case 4: // KeepCheckbox
 				m.KeepCheckbox.Toggle()
+			case 5: // Download button
+				if m.DownloadReady {
+					opts := app.Options {
+						Slug:	m.MangaInput.Value(),
+						All:	m.AllCheckbox.Checked,	
+						ScanDir:m.ScanDirInput.Value(),
+						Cleanup:!m.KeepCheckbox.Checked,
+					}
+
+					if !opts.All {
+						var from, to int
+						_, err := fmt.Sscanf(m.RangeInput.Value(), "%d-%d", &from, &to)
+						if err == nil {
+							opts.Range = [2]int{from, to}
+						}
+					}
+
+					m.IsDownloading = true
+					m.Logs = nil
+					return m, runDownloadInBackground(opts)
+				}
 			}
 			return m, nil
 		}
@@ -61,6 +88,10 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		}
 	}
 
+	m.DownloadReady = m.MangaInput.Value() != "" &&
+		(m.AllCheckbox.Checked || m.RangeInput.Value() != "") &&
+		m.ScanDirInput.Value() != ""
+
 	return m, nil
 }
 
@@ -82,4 +113,27 @@ func updateFocus(m Model) Model {
 		m.ScanDirInput.Focus()
 	}
 	return m
+}
+
+func runDownloadInBackground(opts app.Options) tea.Cmd {
+	return func() tea.Msg {
+		pr, pw := io.Pipe()
+
+		go func() {
+			app.Run(opts, pw)
+			pw.Close()
+		}()
+
+		scanner := bufio.NewScanner(pr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			return logMsg(line)
+		}
+
+		if err := scanner.Err(); err != nil {
+			return logMsg(fmt.Sprintf("Erreur lors de la lecture du log: %v", err))
+		}
+
+		return nil
+	}
 }
