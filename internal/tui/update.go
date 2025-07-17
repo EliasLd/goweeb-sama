@@ -10,6 +10,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+type logMsg string
+
 func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	
@@ -86,6 +88,10 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			m.ScanDirInput, cmd = m.ScanDirInput.Update(msg)
 			return m, cmd
 		}
+
+	case logMsg:
+		m.Logs = append(m.Logs, string(msg))
+		return m, readOneLogLine(m)
 	}
 
 	m.DownloadReady = m.MangaInput.Value() != "" &&
@@ -135,5 +141,21 @@ func runDownloadInBackground(opts app.Options) tea.Cmd {
 		}
 
 		return nil
+	}
+}
+
+func readOneLogLine(m Model) tea.Cmd {
+	return func() tea.Msg {
+		if m.pipeReader == nil {
+			return nil
+		}
+
+		reader := bufio.NewReader(m.pipeReader)
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return logMsg("Téléchargement terminé.")
+		}
+
+		return logMsg(strings.TrimRight(line, "\n"))
 	}
 }
