@@ -2,6 +2,7 @@ package tui
 
 import (
 	"io"
+	"bufio"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -31,6 +32,7 @@ type Model struct {
 	Logs		[]string
 	pipeReader	*io.PipeReader
 	pipeWriter	*io.PipeWriter
+	scanner		*bufio.Scanner
 }
 
 func InitialModel() Model {
