@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"io"
 	"bufio"
-	"strings"
 	app "github.com/EliasLd/scan-scraper/internal/app"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type logMsg string
+
+type setupLogPipeMsg struct {
+	reader *io.PipeReader
+}
 
 func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -92,6 +95,10 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 	case logMsg:
 		m.Logs = append(m.Logs, string(msg))
 		return m, readOneLogLine(m)
+	case setupLogPipeMsg:
+		m.pipeReader = msg.reader
+		m.scanner = bufio.NewScanner(m.pipeReader)
+		return m, readOneLogLine(m)
 	}
 
 	m.DownloadReady = m.MangaInput.Value() != "" &&
@@ -130,32 +137,25 @@ func runDownloadInBackground(opts app.Options) tea.Cmd {
 			pw.Close()
 		}()
 
-		scanner := bufio.NewScanner(pr)
-		for scanner.Scan() {
-			line := scanner.Text()
-			return logMsg(line)
-		}
-
-		if err := scanner.Err(); err != nil {
-			return logMsg(fmt.Sprintf("Erreur lors de la lecture du log: %v", err))
-		}
-
-		return nil
+		return setupLogPipeMsg{reader: pr}
 	}
 }
 
 func readOneLogLine(m Model) tea.Cmd {
 	return func() tea.Msg {
-		if m.pipeReader == nil {
+		if m.scanner == nil {
 			return nil
 		}
 
-		reader := bufio.NewReader(m.pipeReader)
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			return logMsg("Téléchargement terminé.")
+		if m.scanner.Scan() {
+			line := m.scanner.Text()
+			return logMsg(line)
 		}
 
-		return logMsg(strings.TrimRight(line, "\n"))
+		if err := m.scanner.Err(); err != nil {
+			return logMsg(fmt.Sprintf("Error: failed to read log: %v", err))
+		}
+
+		return logMsg("Finished downloading")
 	}
 }
