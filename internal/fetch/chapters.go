@@ -11,7 +11,7 @@ import (
 
 // Deduces the number of chapters
 // using the access url pattern
-func GetChapters(slug string) ([]string, error) {
+func GetChapters(slug string, writer io.Writer) ([]string, error) {
 	baseName := strings.ReplaceAll(slug, "-", " ")
 	baseURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s", strings.Title(baseName))
 
@@ -30,7 +30,7 @@ func GetChapters(slug string) ([]string, error) {
 
 	for {
 		url := fmt.Sprintf("%s/%d/1.jpg", baseURL, i)
-		fmt.Println("Checking:", url)
+		fmt.Fprintln(writer, "Checking:", url)
 
 		var resp *http.Response
 		var err error
@@ -60,11 +60,11 @@ func GetChapters(slug string) ([]string, error) {
 			chapters = append(chapters, strconv.Itoa(i))
 			errorsCounter = 0
 		} else {
-			fmt.Println("Did not find url: ", url)
+			fmt.Fprintln(writer, "Did not find url: ", url)
 			errorsCounter++
 			if errorsCounter >= maxErrorsInARow {
 				// We're assuming there's no more chapters to fetch
-				fmt.Println("Reached max request failures, resuming...")
+				fmt.Fprintln(writer, "Reached max request failures, resuming...")
 				break
 			}
 		}
