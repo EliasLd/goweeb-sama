@@ -80,30 +80,27 @@ func View(m Model) string {
 	form.WriteString(footerStyle.Render("↑/↓ pour naviguer, espace ou entrée pour cocher, Ctrl+C pour quitter"))
 
 	var logs strings.Builder
-
-	const maxLogs = 30
+	const maxLogs = 18
 	start := 0
 	if len(m.Logs) > maxLogs {
 		start = len(m.Logs) - maxLogs
 	}
 
+	visibleLogs := m.Logs[start:]
+	for _, line := range visibleLogs {
+		logs.WriteString(line + "\n")
+	}
+
 	if len(m.Logs) == 0 {
 		logs.WriteString("Aucun log pour le moment...")
-	} else {
-		for _, line := range m.Logs[start:] {
-			logs.WriteString(line + "\n")
-		}
 	}
 
-	// Adapt logBox height
-	height := m.Height - 5
-	if height < 10 {
-		height = 10
+	// Feel blank lines
+	for i := len(visibleLogs); i < maxLogs; i++ {
+		logs.WriteString("\n")
 	}
 
-	logBoxStyleDynamic := logBoxStyle.Copy().Height(height)
-
-	logsView := logBoxStyleDynamic.Render(logs.String())
+	logsView := logBoxStyle.Render(logs.String())
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, form.String(), logsView)
 
