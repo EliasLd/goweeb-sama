@@ -13,7 +13,7 @@ var (
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		Padding(1).
-		Width(50).
+		Width(70).
 		Height(20)
 )
 
@@ -24,7 +24,7 @@ func View(m Model) string {
 	form.WriteString(titleStyle.Render(m.Title))
 	form.WriteString("\n\n")
 	
-	form.WriteString(labelStyle.Render("Nom du manga (espace = -)"))
+	form.WriteString(labelStyle.Render("Nom du manga (remplacer les espaces par des -)"))
 	form.WriteString("\n\n")
 	if m.Cursor == 0 {
 		form.WriteString(m.MangaInput.View())
@@ -95,6 +95,7 @@ func View(m Model) string {
 		logs.WriteString("Aucun log pour le moment...")
 	}
 
+	
 	// Feel blank lines
 	for i := len(visibleLogs); i < maxLogs; i++ {
 		logs.WriteString("\n")
