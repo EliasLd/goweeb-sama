@@ -15,20 +15,18 @@ func Run(opts Options, writer io.Writer) {
 	//opts := ParseFlags()
 	logger := log.New(writer, "", log.LstdFlags)
 	if !opts.All && opts.Range == [2]int{} {
-		fmt.Fprintln(writer, "Please use --all or --range to download chapters.")
+		fmt.Fprintln(writer, "[L] Please use --all or --range to download chapters.")
 		return
 	}
 
-	fmt.Fprintf(writer, "Fetching available chapters for: %s\n", opts.Slug)
-	fmt.Fprintf(writer, "Fetching available chapters for: %s\n", opts.Slug)
-
+	fmt.Fprintf(writer, "[L] Fetching available chapters for: %s\n", opts.Slug)
 
 	chapters, err := fetch.GetChapters(opts.Slug, writer)
 	if err != nil {
-		fmt.Fprintf(writer, "Failed to fecth chapters: %v", err)
+		fmt.Fprintf(writer, "[L] Failed to fecth chapters: %v", err)
 	}
 
-	fmt.Fprintf(writer, "Found %d chapters.\n", len(chapters))
+	fmt.Fprintf(writer, "[L] Found %d chapters.\n", len(chapters))
 
 	// Handle chapter range filtering
 	if opts.Range != [2]int{} {
@@ -41,16 +39,16 @@ func Run(opts Options, writer io.Writer) {
 			}
 		}
 		chapters = filtered
-		fmt.Fprintf(writer, "Filtered to %d chapters from range %d-%d.\n", len(chapters), opts.Range[0], opts.Range[1])
+		fmt.Fprintf(writer, "[L] Filtered to %d chapters from range %d-%d.\n", len(chapters), opts.Range[0], opts.Range[1])
 	}
 
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			logger.Fatalf("Failed to get user home directory: %v", err)
+			logger.Fatalf("[L] Failed to get user home directory: %v", err)
 		}
 
 	for _, chapter := range chapters {
-		fmt.Fprintf(writer, "Downloading chapter %s...\n", chapter)
+		fmt.Fprintf(writer, "[L] Downloading chapter %s...\n", chapter)
 
 		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chapter) 
 		err = fetch.DownloadChapter(opts.Slug, chapter, imageDir, writer)
@@ -73,15 +71,15 @@ func Run(opts Options, writer io.Writer) {
 			continue
 		}
 
-		fmt.Fprintf(writer, "Chapter %s downloaded and saved as %s\n", chapter, pdfPath)
+		fmt.Fprintf(writer, "[L] Chapter %s downloaded and saved as %s\n", chapter, pdfPath)
 	}
 
 	if opts.Cleanup {
 		rootImagesDir := filepath.Join(homeDir, "Images", opts.Slug)
-		fmt.Fprintf(writer, "Cleaning up images directory: %s\n", rootImagesDir)
+		fmt.Fprintf(writer, "[L] Cleaning up images directory: %s\n", rootImagesDir)
 		err := os.RemoveAll(rootImagesDir)
 		if err != nil {
-			logger.Fatalf("Failed to remove dir: %w", err)
+			logger.Fatalf("[L] Failed to remove dir: %w", err)
 		}
 	}
 }
