@@ -3,6 +3,8 @@ package tui
 import (
 	"io"
 	"bufio"
+	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -35,6 +37,15 @@ type Model struct {
 	scanner		*bufio.Scanner
 }
 
+func getDefaultScanDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	return filepath.Join(home, "Documents", "<nom_du_manga>")
+}
+
 func InitialModel() Model {
 	manga := textinput.New()
 	manga.Placeholder = "ex: jujutsu-kaisen"
@@ -51,6 +62,7 @@ func InitialModel() Model {
 	scanDir := textinput.New()
 	scanDir.Placeholder = "ex: C:\\Users\\<username>\\Documents\\scans\\jjk"
 	scanDir.Prompt = "> "
+	scanDir.SetValue(getDefaultScanDir())
 	scanDir.Width = 70
 
 	return Model {
