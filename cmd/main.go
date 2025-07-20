@@ -1,9 +1,14 @@
 package main
 
 import (
-	"github.com/EliasLd/scan-scraper/internal/app"
+	"log"
+
+	"github.com/EliasLd/scan-scraper/internal/tui"
 )
 
 func main() {
-	app.Run()
+	if err := tui.Start(); err != nil {
+		log.Fatalf("Failed to execute the interface : %v", err)
+	}
 }
+

@@ -3,6 +3,7 @@ package convert
 import (
 	"fmt"
 	"os"
+	"io"
 	"image"
 	"image/jpeg"
 	"path/filepath"
@@ -62,7 +63,7 @@ func WebPToJPG(srcPath, destPath string) error {
 	return nil
 }
 
-func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
+func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, writer io.Writer) error {
 	files, err := os.ReadDir(imagesDir)
 	if err != nil {
 		return fmt.Errorf("Failed to read image dir: %v", err)
@@ -103,7 +104,7 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 			if isWebP {
 				err := WebPToJPG(imagePath, imagePath)
 				if err != nil {
-					fmt.Printf("Failed to convert WebP: %v\n", err)
+					fmt.Fprintf(writer, "Failed to convert WebP: %v\n", err)
 					continue
 				}
 			}
@@ -139,7 +140,7 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool) error {
 		return fmt.Errorf("Failed to write PDF: %w", err)
 	}
 
-	fmt.Printf("PDF generated at: %s\n",outputPDFPath)
+	fmt.Fprintf(writer, "PDF generated at: %s\n",outputPDFPath)
 
 	return nil
 }
