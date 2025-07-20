@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"io"
 	"bufio"
+	"strings"
 	app "github.com/EliasLd/scan-scraper/internal/app"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
+
+var highlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
 
 type logMsg string
 
@@ -93,7 +97,17 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		}
 
 	case logMsg:
-		m.Logs = append(m.Logs, string(msg))
+		if msg == "Finished downloading" {
+			styled := highlightStyle.Render(string(msg))
+			m.Logs = append(m.Logs, styled)
+			m.IsDownloading = false
+			return m, nil
+		}
+		logLine := string(msg)
+		// Add only essential logs marked with [L]
+		if strings.HasPrefix(logLine, "[L]") {
+			m.Logs = append(m.Logs, string(msg))
+		}
 		return m, readOneLogLine(m)
 	case setupLogPipeMsg:
 		m.pipeReader = msg.reader
