@@ -15,7 +15,7 @@ func Run(opts Options, writer io.Writer) {
 	//opts := ParseFlags()
 	logger := log.New(writer, "", log.LstdFlags)
 	if !opts.All && opts.Range == [2]int{} {
-		fmt.Fprintln(writer, "[L] Please use --all or --range to download chapters.")
+		fmt.Fprintln(writer, "[E] Please use --all or --range to download chapters.")
 		return
 	}
 
@@ -23,7 +23,7 @@ func Run(opts Options, writer io.Writer) {
 
 	chapters, err := fetch.GetChapters(opts.Slug, writer)
 	if err != nil {
-		fmt.Fprintf(writer, "[L] Failed to fecth chapters: %v", err)
+		fmt.Fprintf(writer, "[E] Failed to fecth chapters: %v", err)
 	}
 
 	fmt.Fprintf(writer, "[L] Found %d chapters.\n", len(chapters))
