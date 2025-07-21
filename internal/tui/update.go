@@ -12,6 +12,7 @@ import (
 )
 
 var highlightStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("226"))
+var errorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 
 type logMsg string
 
@@ -97,16 +98,18 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		}
 
 	case logMsg:
-		if msg == "Finished downloading" {
+		logLine := string(msg)
+
+		switch {
+		case logLine == "Finished downloading":
 			styled := highlightStyle.Render(string(msg))
 			m.Logs = append(m.Logs, styled)
 			m.IsDownloading = false
-			return m, nil
-		}
-		logLine := string(msg)
-		// Add only essential logs marked with [L]
-		if strings.HasPrefix(logLine, "[L]") {
-			m.Logs = append(m.Logs, string(msg))
+		case strings.HasPrefix(logLine, "[L]"):
+			m.Logs = append(m.Logs, logLine)	
+		case strings.HasPrefix(logLine, "[E]"):
+			styled := errorStyle.Render(logLine)
+			m.Logs = append(m.Logs, styled)
 		}
 		return m, readOneLogLine(m)
 	case setupLogPipeMsg:
@@ -169,7 +172,11 @@ func readOneLogLine(m Model) tea.Cmd {
 		if err := m.scanner.Err(); err != nil {
 			return logMsg(fmt.Sprintf("Error: failed to read log: %v", err))
 		}
+		
+		if m.IsDownloading {
+			return logMsg("Finished downloading")
+		}
 
-		return logMsg("Finished downloading")
+		return nil
 	}
 }
