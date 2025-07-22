@@ -66,6 +66,7 @@ func WebPToJPG(srcPath, destPath string) error {
 func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, writer io.Writer) error {
 	files, err := os.ReadDir(imagesDir)
 	if err != nil {
+		fmt.Fprintf(writer, "[E] Failed to read image dir: %v", err)
 		return fmt.Errorf("Failed to read image dir: %v", err)
 	}
 	
@@ -137,6 +138,7 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, writer io.Writer
 
 	// Save newly created PDF file
 	if err := pdf.WritePdf(outputPDFPath); err != nil {
+		fmt.Fprintf(writer, "[E] Failed to write PDF: %w", err)
 		return fmt.Errorf("Failed to write PDF: %w", err)
 	}
 
