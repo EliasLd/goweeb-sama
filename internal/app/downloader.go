@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"io"
 	"path/filepath"
@@ -13,7 +12,6 @@ import (
 
 func Run(opts Options, writer io.Writer) {
 	//opts := ParseFlags()
-	logger := log.New(writer, "", log.LstdFlags)
 	if !opts.All && opts.Range == [2]int{} {
 		fmt.Fprintln(writer, "[E] Please use --all or --range to download chapters.")
 		return
@@ -44,7 +42,7 @@ func Run(opts Options, writer io.Writer) {
 
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			logger.Fatalf("[L] Failed to get user home directory: %v", err)
+			fmt.Fprintf(writer, "[E] Failed to get user home directory: %v", err)
 		}
 
 	for _, chapter := range chapters {
@@ -53,21 +51,21 @@ func Run(opts Options, writer io.Writer) {
 		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chapter) 
 		err = fetch.DownloadChapter(opts.Slug, chapter, imageDir, writer)
 		if err != nil {
-			logger.Printf("Failed to download chapter %s: %v", chapter, err)
+			fmt.Fprintf(writer, "[E] Failed to download chapter %s: %v", chapter, err)
 			continue
 		}
 
 		// Create output path if not exists
 		err := os.MkdirAll(opts.ScanDir, os.ModePerm)
 		if err != nil {
-			logger.Printf("Failed to create output directory %s: %v", opts.ScanDir, err)
+			fmt.Fprintf(writer, "[E] Failed to create output directory %s: %v", opts.ScanDir, err)
 			return
 		}
 
 		pdfPath := filepath.Join(opts.ScanDir, fmt.Sprintf("%s_%s.pdf", opts.Slug, chapter))
 		err = convert.ImagesToPDF(imageDir, pdfPath, opts.Cleanup, writer)
 		if err != nil {
-			logger.Printf("Failed to create PDF for chapter %s: %v\n", chapter, err)
+			fmt.Fprintf(writer, "[E] Failed to create PDF for chapter %s: %v\n", chapter, err)
 			continue
 		}
 
@@ -79,7 +77,7 @@ func Run(opts Options, writer io.Writer) {
 		fmt.Fprintf(writer, "[L] Cleaning up images directory: %s\n", rootImagesDir)
 		err := os.RemoveAll(rootImagesDir)
 		if err != nil {
-			logger.Fatalf("[L] Failed to remove dir: %w", err)
+			fmt.Fprintf(writer, "[E] Failed to remove dir: %w", err)
 		}
 	}
 }
