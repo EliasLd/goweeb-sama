@@ -51,7 +51,8 @@ func GetChapters(slug string, writer io.Writer) ([]string, error) {
 		}
 		
 		if err != nil {
-			return nil, fmt.Errorf("HTTP GET failed after %d attemps: %v", maxRetries, err)
+			fmt.Fprintf(writer, "[E] HTTP GET failed after %d attempts: %v", maxRetries, err)
+			return nil, err
 		}
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
