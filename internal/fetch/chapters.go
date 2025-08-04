@@ -4,10 +4,36 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 )
+
+var lowercaseWords = map[string]bool{
+	"in": true, "on": true, "the": true, "of": true, "and": true, "or": true,
+}
+
+func generateNameVariants(slug string) []string {
+	words := strings.Split(strings.ReplaceAll(slug, "-", " "), " ")
+
+	titleCase := strings.Title(strings.Join(words, " "))
+	lower := strings.ToLower(strings.Join(words, " "))
+	normal := strings.Join(words, " ")
+	capitalized := capitalizeExceptSmallWords(words)
+
+	return []string{titleCase, capitalized, lower, normal}
+}
+
+func capitalizeExceptSmallWords(words []string) string {
+	for i, word := range words {
+		if i == 0 || !lowercaseWords[strings.ToLower(word)] {
+			words[i] = strings.Title(strings.ToLower(word))
+		} else {
+			words[i] = strings.ToLower(word)
+		}
+	}
+	return strings.Join(words, " ")
+}
 
 // Deduces the number of chapters
 // using the access url pattern
@@ -24,7 +50,7 @@ func GetChapters(slug string, writer io.Writer) ([]string, error) {
 	i := 0
 
 	// Reusable http client with timeout
-	client := &http.Client {
+	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
@@ -49,7 +75,7 @@ func GetChapters(slug string, writer io.Writer) ([]string, error) {
 				time.Sleep(1 * time.Second)
 			}
 		}
-		
+
 		if err != nil {
 			fmt.Fprintf(writer, "[E] HTTP GET failed after %d attempts: %v", maxRetries, err)
 			return nil, err
