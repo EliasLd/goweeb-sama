@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"strconv"
 	"time"
 )
@@ -12,8 +11,11 @@ import (
 // Deduces the number of chapters
 // using the access url pattern
 func GetChapters(slug string, writer io.Writer) ([]string, error) {
-	baseName := strings.ReplaceAll(slug, "-", " ")
-	baseURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s", strings.Title(baseName))
+	correctName, err := DetectCorrectMangaName(slug, 1, writer)
+	if err != nil {
+		return nil, err
+	}
+	baseURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s", correctName)
 
 	var chapters []string
 
@@ -24,7 +26,7 @@ func GetChapters(slug string, writer io.Writer) ([]string, error) {
 	i := 0
 
 	// Reusable http client with timeout
-	client := &http.Client {
+	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
@@ -49,7 +51,7 @@ func GetChapters(slug string, writer io.Writer) ([]string, error) {
 				time.Sleep(1 * time.Second)
 			}
 		}
-		
+
 		if err != nil {
 			fmt.Fprintf(writer, "[E] HTTP GET failed after %d attempts: %v", maxRetries, err)
 			return nil, err

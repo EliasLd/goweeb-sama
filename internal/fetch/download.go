@@ -6,14 +6,18 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // Downloads all pages of a chapter
 // ans saves them into destDir.
-func DownloadChapter(slug , chapter , destDir string, writer io.Writer) error {
-	baseName := strings.ReplaceAll(slug, "-", " ")
-	baseURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s/%s", strings.Title(baseName), chapter)
+func DownloadChapter(slug, chapter, destDir string, writer io.Writer) error {
+	correctName, err := DetectCorrectMangaName(slug, atoiSafe(chapter), writer)
+	if err != nil {
+		fmt.Fprintf(writer, "[E] Could not detect proper name for %s: %v", slug, err)
+		return err
+	}
+
+	baseURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s/%s", correctName, chapter)
 
 	const defaultDirPerm = 0755
 	// Creates dest directory if needed
@@ -21,7 +25,7 @@ func DownloadChapter(slug , chapter , destDir string, writer io.Writer) error {
 		fmt.Fprintf(writer, "[E] Failed to create destination folder: %v", err)
 		return fmt.Errorf("Failed to create destDir: %v", err)
 	}
-	
+
 	fmt.Fprintln(writer, "Using directory: ", destDir)
 	for page := 1; ; page++ {
 		imgURL := fmt.Sprintf("%s/%d.jpg", baseURL, page)
@@ -41,7 +45,7 @@ func DownloadChapter(slug , chapter , destDir string, writer io.Writer) error {
 			// end of the current chapter.
 			break
 		}
-		
+
 		// Save jpg file with 3
 		imgPath := filepath.Join(destDir, fmt.Sprintf("%03d.jpg", page))
 		outFile, err := os.Create(imgPath)
