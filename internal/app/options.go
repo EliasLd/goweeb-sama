@@ -10,11 +10,12 @@ import (
 
 // Holds parsed CLI arguments
 type Options struct {
-	Slug    string
-	All     bool
-	Range   [2]int // [0] = start, [1] = end (0 means open-ended)
-	ScanDir string
-	Cleanup bool
+	Slug         string
+	All          bool
+	Range        [2]int // [0] = start, [1] = end (0 means open-ended)
+	ScanDir      string
+	Cleanup      bool
+	CustomDomain string // custom domain override
 }
 
 func ParseFlags() Options {
@@ -32,6 +33,10 @@ func ParseFlags() Options {
 	keepImagesFlag := flag.Bool("keep-images", false, "Keep images after PDF creation")
 	keepImagesShort := flag.Bool("k", false, "Shorthand for --keep-images")
 
+	var customDomain string
+	flag.StringVar(&customDomain, "domain", "", "Override anime-sama domain (e.g., https://anime-sama.tv)")
+	flag.StringVar(&customDomain, "u", "", "Shorthand for --domain")
+
 	flag.Parse()
 
 	// Expecting slug (manga title) as a positional argument
@@ -47,6 +52,15 @@ func ParseFlags() Options {
 	all := *allFlag || *allShort
 	dir := scanDir
 	keepImages := *keepImagesFlag || *keepImagesShort
+	domain := customDomain
+
+	// Normalize domain (remove trailing slash, ensure https://)
+	if domain != "" {
+		domain = strings.TrimSuffix(domain, "/")
+		if !strings.HasPrefix(domain, "http://") && !strings.HasPrefix(domain, "https://") {
+			domain = "https://" + domain
+		}
+	}
 
 	// Parse chapters range
 	rangeStr := *rangeFlag
@@ -90,10 +104,11 @@ func ParseFlags() Options {
 	}
 
 	return Options{
-		Slug:    slug,
-		All:     all,
-		Range:   chapterRange,
-		ScanDir: dir,
-		Cleanup: !keepImages,
+		Slug:         slug,
+		All:          all,
+		Range:        chapterRange,
+		ScanDir:      dir,
+		Cleanup:      !keepImages,
+		CustomDomain: domain,
 	}
 }
