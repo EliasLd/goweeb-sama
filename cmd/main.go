@@ -1,14 +1,12 @@
 package main
 
 import (
-	"log"
+	"os"
 
-	"github.com/EliasLd/scan-scraper/internal/tui"
+	"github.com/EliasLd/scan-scraper/internal/app"
 )
 
 func main() {
-	if err := tui.Start(); err != nil {
-		log.Fatalf("Failed to execute the interface : %v", err)
-	}
+	opts := app.ParseFlags()
+	app.Run(opts, os.Stdout)
 }
-

@@ -15,7 +15,7 @@ func GetChapters(slug string, writer io.Writer) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	baseURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s", correctName)
+	baseURL := fmt.Sprintf("https://anime-sama.tv/s2/scans/%s", correctName)
 
 	var chapters []string
 

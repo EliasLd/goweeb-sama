@@ -17,7 +17,7 @@ func DownloadChapter(slug, chapter, destDir string, writer io.Writer) error {
 		return err
 	}
 
-	baseURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s/%s", correctName, chapter)
+	baseURL := fmt.Sprintf("https://anime-sama.tv/s2/scans/%s/%s", correctName, chapter)
 
 	const defaultDirPerm = 0755
 	// Creates dest directory if needed

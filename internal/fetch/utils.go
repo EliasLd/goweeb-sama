@@ -63,7 +63,7 @@ func DetectCorrectMangaName(slug string, chapter int, writer io.Writer) (string,
 	variants := generateNameVariants(slug)
 
 	for _, name := range variants {
-		testURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s/%d/1.jpg", name, chapter)
+		testURL := fmt.Sprintf("https://anime-sama.tv/s2/scans/%s/%d/1.jpg", name, chapter)
 		fmt.Fprintln(writer, "[L] Trying variant:", testURL)
 
 		req, _ := http.NewRequest("GET", testURL, nil)
