@@ -20,9 +20,9 @@ type Options struct {
 func ParseFlags() Options {
 	// Define flags
 	allFlag := flag.Bool("all", false, "Download all available chapters")
-	allShort := flag.Bool("a", false, "Download all available chapters (Shorthand)")
+	allShort := flag.Bool("a", false, "Shortand for --all)")
 
-	rangeFlag := flag.String("range", "", "Range of chapters to download, e.g., 10-77")
+	rangeFlag := flag.String("range", "", "Range of chapters to download, e.g., 10-77, 14-")
 	rangeShort := flag.String("r", "", "Shorthand for --range")
 
 	var scanDir string
