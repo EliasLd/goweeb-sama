@@ -2,10 +2,10 @@ package convert
 
 import (
 	"fmt"
-	"os"
-	"io"
 	"image"
 	"image/jpeg"
+	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -69,7 +69,7 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, writer io.Writer
 		fmt.Fprintf(writer, "[E] Failed to read image dir: %v", err)
 		return fmt.Errorf("Failed to read image dir: %v", err)
 	}
-	
+
 	var imageFiles []string
 	for _, f := range files {
 		if f.IsDir() {
@@ -90,7 +90,6 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, writer io.Writer
 
 	pdf := gopdf.GoPdf{}
 	pdf.Start(gopdf.Config{})
-
 
 	for _, imageName := range imageFiles {
 		imagePath := filepath.Join(imagesDir, imageName)
@@ -138,11 +137,11 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, writer io.Writer
 
 	// Save newly created PDF file
 	if err := pdf.WritePdf(outputPDFPath); err != nil {
-		fmt.Fprintf(writer, "[E] Failed to write PDF: %w", err)
+		fmt.Fprintf(writer, "[E] Failed to write PDF: %v", err)
 		return fmt.Errorf("Failed to write PDF: %w", err)
 	}
 
-	fmt.Fprintf(writer, "PDF generated at: %s\n",outputPDFPath)
+	fmt.Fprintf(writer, "PDF generated at: %s\n", outputPDFPath)
 
 	return nil
 }
