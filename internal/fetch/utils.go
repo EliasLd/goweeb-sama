@@ -58,12 +58,16 @@ func capitalizeWordsExceptSmallWords(words []string) string {
 	return strings.Join(words, " ")
 }
 
-func DetectCorrectMangaName(slug string, chapter int, writer io.Writer) (string, error) {
+// Tries different name variants to find the correct
+// umanga name using the provided domain
+func DetectCorrectMangaName(slug string, chapter int, domain string, writer io.Writer) (string, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	variants := generateNameVariants(slug)
 
+	domain = strings.TrimSuffix(domain, "/")
+
 	for _, name := range variants {
-		testURL := fmt.Sprintf("https://anime-sama.tv/s2/scans/%s/%d/1.jpg", name, chapter)
+		testURL := fmt.Sprintf("%s/s2/scans/%s/%d/1.jpg", domain, name, chapter)
 		fmt.Fprintln(writer, "[L] Trying variant:", testURL)
 
 		req, _ := http.NewRequest("GET", testURL, nil)

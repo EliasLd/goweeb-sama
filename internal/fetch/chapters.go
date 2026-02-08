@@ -12,12 +12,12 @@ import (
 // using the access url pattern.
 // If endCheck is 0, it will search until
 // maxErrorsInARow consecutive failures
-func GetChapters(slug string, startCheck, endCheck int, writer io.Writer) ([]string, error) {
-	correctName, err := DetectCorrectMangaName(slug, 1, writer)
+func GetChapters(slug string, startCheck, endCheck int, domain string, writer io.Writer) ([]string, error) {
+	correctName, err := DetectCorrectMangaName(slug, 1, domain, writer)
 	if err != nil {
 		return nil, err
 	}
-	baseURL := fmt.Sprintf("https://anime-sama.tv/s2/scans/%s", correctName)
+	baseURL := BuildScanBaseURL(domain, correctName)
 
 	var chapters []string
 

@@ -16,6 +16,9 @@ func Run(opts Options, writer io.Writer) {
 		return
 	}
 
+	// Detect or use custom domain
+	activeDomain := fetch.GetActiveDomain(opts.CustomDomain, writer)
+
 	fmt.Fprintf(writer, "[L] Fetching available chapters for: %s\n", opts.Slug)
 
 	startChapter := 1
@@ -32,7 +35,7 @@ func Run(opts Options, writer io.Writer) {
 		}
 	}
 
-	chapters, err := fetch.GetChapters(opts.Slug, startChapter, endChapter, writer)
+	chapters, err := fetch.GetChapters(opts.Slug, startChapter, endChapter, activeDomain, writer)
 	if err != nil {
 		fmt.Fprintf(writer, "[E] Failed to fetch chapters: %v\n", err)
 		return
@@ -55,7 +58,7 @@ func Run(opts Options, writer io.Writer) {
 		fmt.Fprintf(writer, "[L] Downloading chapter %s...\n", chapter)
 
 		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chapter)
-		err = fetch.DownloadChapter(opts.Slug, chapter, imageDir, writer)
+		err = fetch.DownloadChapter(opts.Slug, chapter, imageDir, activeDomain, writer)
 		if err != nil {
 			fmt.Fprintf(writer, "[E] Failed to download chapter %s: %v\n", chapter, err)
 			continue
