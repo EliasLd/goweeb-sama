@@ -12,7 +12,7 @@ jobs:
   build:
     name: Build and Release
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -26,25 +26,33 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Build binaries
+      - name: Build binaries and archive them
         run: |
-          mkdir -p builds
-          
+          mkdir -p dist
+
           # Linux AMD64
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o builds/scan-scraper-${{ steps.get_version.outputs.VERSION }}-linux-amd64 ./cmd/main.go
-          
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o goweeb ./cmd/main.go
+          tar -czvf dist/goweeb-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz goweeb
+          rm goweeb
+
           # Windows AMD64
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o builds/scan-scraper-${{ steps.get_version.outputs.VERSION }}-windows-amd64.exe ./cmd/main.go
-          
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o goweeb.exe ./cmd/main.go
+          zip dist/goweeb-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip goweeb.exe
+          rm goweeb.exe
+
           # macOS AMD64
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o builds/scan-scraper-${{ steps.get_version.outputs.VERSION }}-darwin-amd64 ./cmd/main.go
-          
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o goweeb ./cmd/main.go
+          tar -czvf dist/goweeb-${{ steps.get_version.outputs.VERSION }}-macos-amd64.tar.gz goweeb
+          rm goweeb
+
           # macOS ARM64
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o builds/scan-scraper-${{ steps.get_version.outputs.VERSION }}-darwin-arm64 ./cmd/main.go
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o goweeb ./cmd/main.go
+          tar -czvf dist/goweeb-${{ steps.get_version.outputs.VERSION }}-macos-arm64.tar.gz goweeb
+          rm goweeb
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: builds/*
+          files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
