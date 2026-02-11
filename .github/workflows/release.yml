@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -20,7 +20,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: "1.21"
 
       - name: Get version from tag
         id: get_version
@@ -28,27 +28,56 @@ jobs:
 
       - name: Build binaries and archive them
         run: |
+          set -euo pipefail
           mkdir -p dist
 
-          # Linux AMD64
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o goweeb ./cmd/main.go
-          tar -czvf dist/goweeb-${{ steps.get_version.outputs.VERSION }}-linux-amd64.tar.gz goweeb
-          rm goweeb
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
 
-          # Windows AMD64
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o goweeb.exe ./cmd/main.go
-          zip dist/goweeb-${{ steps.get_version.outputs.VERSION }}-windows-amd64.zip goweeb.exe
-          rm goweeb.exe
+          build_cli() {
+            local os="$1"
+            local arch="$2"
+            local ext="$3"
 
-          # macOS AMD64
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o goweeb ./cmd/main.go
-          tar -czvf dist/goweeb-${{ steps.get_version.outputs.VERSION }}-macos-amd64.tar.gz goweeb
-          rm goweeb
+            local bin="goweeb${ext}"
+            GOOS="${os}" GOARCH="${arch}" go build -ldflags="-s -w" -o "${bin}" ./cmd/goweeb-cli
 
-          # macOS ARM64
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o goweeb ./cmd/main.go
-          tar -czvf dist/goweeb-${{ steps.get_version.outputs.VERSION }}-macos-arm64.tar.gz goweeb
-          rm goweeb
+            if [ "${os}" = "windows" ]; then
+              zip "dist/goweeb-${VERSION}-${os}-${arch}.zip" "${bin}"
+            else
+              tar -czvf "dist/goweeb-${VERSION}-${os}-${arch}.tar.gz" "${bin}"
+            fi
+
+            rm "${bin}"
+          }
+
+          build_tui() {
+            local os="$1"
+            local arch="$2"
+            local ext="$3"
+
+            local bin="goweeb-tui${ext}"
+            GOOS="${os}" GOARCH="${arch}" go build -ldflags="-s -w" -o "${bin}" ./cmd/goweeb-tui
+
+            if [ "${os}" = "windows" ]; then
+              zip "dist/goweeb-tui-${VERSION}-${os}-${arch}.zip" "${bin}"
+            else
+              tar -czvf "dist/goweeb-tui-${VERSION}-${os}-${arch}.tar.gz" "${bin}"
+            fi
+
+            rm "${bin}"
+          }
+
+          # CLI
+          build_cli linux amd64 ""
+          build_cli windows amd64 ".exe"
+          build_cli darwin amd64 ""
+          build_cli darwin arm64 ""
+
+          # TUI
+          build_tui linux amd64 ""
+          build_tui windows amd64 ".exe"
+          build_tui darwin amd64 ""
+          build_tui darwin arm64 ""
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
