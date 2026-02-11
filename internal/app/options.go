@@ -5,23 +5,25 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 // Holds parsed CLI arguments
 type Options struct {
-	Slug	string
-	All	bool
-	Range	[2]int
-	ScanDir	string
-	Cleanup bool
+	Slug         string
+	All          bool
+	Range        [2]int // [0] = start, [1] = end (0 means open-ended)
+	ScanDir      string
+	Cleanup      bool
+	CustomDomain string // custom domain override
 }
 
 func ParseFlags() Options {
 	// Define flags
 	allFlag := flag.Bool("all", false, "Download all available chapters")
-	allShort := flag.Bool("a", false, "Download all available chapters (Shorthand)")
+	allShort := flag.Bool("a", false, "Shortand for --all)")
 
-	rangeFlag := flag.String("range", "", "Range of chapters to download, e.g., 10-77")
+	rangeFlag := flag.String("range", "", "Range of chapters to download, e.g., 10-77, 14-")
 	rangeShort := flag.String("r", "", "Shorthand for --range")
 
 	var scanDir string
@@ -31,6 +33,9 @@ func ParseFlags() Options {
 	keepImagesFlag := flag.Bool("keep-images", false, "Keep images after PDF creation")
 	keepImagesShort := flag.Bool("k", false, "Shorthand for --keep-images")
 
+	var customDomain string
+	flag.StringVar(&customDomain, "domain", "", "Override anime-sama domain (e.g., https://anime-sama.tv)")
+	flag.StringVar(&customDomain, "u", "", "Shorthand for --domain")
 
 	flag.Parse()
 
@@ -47,6 +52,15 @@ func ParseFlags() Options {
 	all := *allFlag || *allShort
 	dir := scanDir
 	keepImages := *keepImagesFlag || *keepImagesShort
+	domain := customDomain
+
+	// Normalize domain (remove trailing slash, ensure https://)
+	if domain != "" {
+		domain = strings.TrimSuffix(domain, "/")
+		if !strings.HasPrefix(domain, "http://") && !strings.HasPrefix(domain, "https://") {
+			domain = "https://" + domain
+		}
+	}
 
 	// Parse chapters range
 	rangeStr := *rangeFlag
@@ -56,14 +70,28 @@ func ParseFlags() Options {
 
 	var chapterRange [2]int
 	if rangeStr != "" {
-		var start, end int
-		n, err := fmt.Sscanf(rangeStr, "%d-%d", &start, &end)
-		if err != nil || n != 2 || start > end {
-			fmt.Printf("Invalid range format: %s. Use format: <start>-<end>\n", rangeStr)
-			os.Exit(1)
+		// Handle open-ended range like "10-"
+		if strings.HasSuffix(rangeStr, "-") {
+			var start int
+			trimmed := strings.TrimSuffix(rangeStr, "-")
+			n, err := fmt.Sscanf(trimmed, "%d", &start)
+			if err != nil || n != 1 {
+				fmt.Printf("Invalid range format: %s. Use format: <start>-<end> or <start>-\n", rangeStr)
+				os.Exit(1)
+			}
+			chapterRange[0] = start
+			chapterRange[1] = 0 // 0 means open-ended
+		} else {
+			// Normal range like "10-20"
+			var start, end int
+			n, err := fmt.Sscanf(rangeStr, "%d-%d", &start, &end)
+			if err != nil || n != 2 || start > end {
+				fmt.Printf("Invalid range format: %s. Use format: <start>-<end> or <start>-\n", rangeStr)
+				os.Exit(1)
+			}
+			chapterRange[0] = start
+			chapterRange[1] = end
 		}
-		chapterRange[0] = start
-		chapterRange[1] = end
 	}
 
 	// Create scanDir if it doesn't exist
@@ -75,12 +103,12 @@ func ParseFlags() Options {
 		}
 	}
 
-	return Options {
-		Slug:	slug,
-		All:	all,
-		Range:	chapterRange,
-		ScanDir:dir,
-		Cleanup:!keepImages,
+	return Options{
+		Slug:         slug,
+		All:          all,
+		Range:        chapterRange,
+		ScanDir:      dir,
+		Cleanup:      !keepImages,
+		CustomDomain: domain,
 	}
 }
-

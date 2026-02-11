@@ -2,63 +2,72 @@ package app
 
 import (
 	"fmt"
-	"os"
 	"io"
+	"os"
 	"path/filepath"
 
-	"github.com/EliasLd/scan-scraper/internal/fetch"
 	"github.com/EliasLd/scan-scraper/internal/convert"
+	"github.com/EliasLd/scan-scraper/internal/fetch"
 )
 
 func Run(opts Options, writer io.Writer) {
-	//opts := ParseFlags()
 	if !opts.All && opts.Range == [2]int{} {
 		fmt.Fprintln(writer, "[E] Please use --all or --range to download chapters.")
 		return
 	}
 
+	// Detect or use custom domain
+	activeDomain := fetch.GetActiveDomain(opts.CustomDomain, writer)
+
 	fmt.Fprintf(writer, "[L] Fetching available chapters for: %s\n", opts.Slug)
 
-	chapters, err := fetch.GetChapters(opts.Slug, writer)
+	startChapter := 1
+	endChapter := 0 // 0 means open-ended (search until no more chapters)
+
+	if opts.Range != [2]int{} {
+		startChapter = opts.Range[0]
+		endChapter = opts.Range[1]
+
+		if endChapter == 0 {
+			fmt.Fprintf(writer, "[L] Searching from chapter %d to the end...\n", startChapter)
+		} else {
+			fmt.Fprintf(writer, "[L] Searching for chapters %d to %d...\n", startChapter, endChapter)
+		}
+	}
+
+	chapters, err := fetch.GetChapters(opts.Slug, startChapter, endChapter, activeDomain, writer)
 	if err != nil {
-		fmt.Fprintf(writer, "[E] Failed to fecth chapters: %v", err)
+		fmt.Fprintf(writer, "[E] Failed to fetch chapters: %v\n", err)
+		return
+	}
+
+	if len(chapters) == 0 {
+		fmt.Fprintln(writer, "[W] No chapters found in the specified range.")
+		return
 	}
 
 	fmt.Fprintf(writer, "[L] Found %d chapters.\n", len(chapters))
 
-	// Handle chapter range filtering
-	if opts.Range != [2]int{} {
-		var filtered []string
-		for _, ch := range chapters {
-			var chapterNum int
-			_, err := fmt.Sscanf(ch, "%d", &chapterNum)
-			if err == nil && chapterNum >= opts.Range[0] && chapterNum <= opts.Range[1] {
-				filtered = append(filtered, ch)
-			}
-		}
-		chapters = filtered
-		fmt.Fprintf(writer, "[L] Filtered to %d chapters from range %d-%d.\n", len(chapters), opts.Range[0], opts.Range[1])
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintf(writer, "[E] Failed to get user home directory: %v\n", err)
+		return
 	}
-
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			fmt.Fprintf(writer, "[E] Failed to get user home directory: %v", err)
-		}
 
 	for _, chapter := range chapters {
 		fmt.Fprintf(writer, "[L] Downloading chapter %s...\n", chapter)
 
-		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chapter) 
-		err = fetch.DownloadChapter(opts.Slug, chapter, imageDir, writer)
+		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chapter)
+		err = fetch.DownloadChapter(opts.Slug, chapter, imageDir, activeDomain, writer)
 		if err != nil {
-			fmt.Fprintf(writer, "[E] Failed to download chapter %s: %v", chapter, err)
+			fmt.Fprintf(writer, "[E] Failed to download chapter %s: %v\n", chapter, err)
 			continue
 		}
 
 		// Create output path if not exists
-		err := os.MkdirAll(opts.ScanDir, os.ModePerm)
+		err = os.MkdirAll(opts.ScanDir, os.ModePerm)
 		if err != nil {
-			fmt.Fprintf(writer, "[E] Failed to create output directory %s: %v", opts.ScanDir, err)
+			fmt.Fprintf(writer, "[E] Failed to create output directory %s: %v\n", opts.ScanDir, err)
 			return
 		}
 
@@ -77,7 +86,7 @@ func Run(opts Options, writer io.Writer) {
 		fmt.Fprintf(writer, "[L] Cleaning up images directory: %s\n", rootImagesDir)
 		err := os.RemoveAll(rootImagesDir)
 		if err != nil {
-			fmt.Fprintf(writer, "[E] Failed to remove dir: %w", err)
+			fmt.Fprintf(writer, "[E] Failed to remove dir: %v\n", err)
 		}
 	}
 }

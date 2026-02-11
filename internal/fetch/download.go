@@ -10,14 +10,15 @@ import (
 
 // Downloads all pages of a chapter
 // ans saves them into destDir.
-func DownloadChapter(slug, chapter, destDir string, writer io.Writer) error {
-	correctName, err := DetectCorrectMangaName(slug, atoiSafe(chapter), writer)
+func DownloadChapter(slug, chapter, destDir, domain string, writer io.Writer) error {
+	correctName, err := DetectCorrectMangaName(slug, atoiSafe(chapter), domain, writer)
 	if err != nil {
 		fmt.Fprintf(writer, "[E] Could not detect proper name for %s: %v", slug, err)
 		return err
 	}
 
-	baseURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s/%s", correctName, chapter)
+	baseURL := BuildScanBaseURL(domain, correctName)
+	chapterURL := fmt.Sprintf("%s/%s", baseURL, chapter)
 
 	const defaultDirPerm = 0755
 	// Creates dest directory if needed
@@ -28,7 +29,7 @@ func DownloadChapter(slug, chapter, destDir string, writer io.Writer) error {
 
 	fmt.Fprintln(writer, "Using directory: ", destDir)
 	for page := 1; ; page++ {
-		imgURL := fmt.Sprintf("%s/%d.jpg", baseURL, page)
+		imgURL := fmt.Sprintf("%s/%d.jpg", chapterURL, page)
 		fmt.Fprintln(writer, "Downloading: ", imgURL)
 
 		resp, err := http.Get(imgURL)

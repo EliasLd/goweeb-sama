@@ -9,13 +9,15 @@ import (
 )
 
 // Deduces the number of chapters
-// using the access url pattern
-func GetChapters(slug string, writer io.Writer) ([]string, error) {
-	correctName, err := DetectCorrectMangaName(slug, 1, writer)
+// using the access url pattern.
+// If endCheck is 0, it will search until
+// maxErrorsInARow consecutive failures
+func GetChapters(slug string, startCheck, endCheck int, domain string, writer io.Writer) ([]string, error) {
+	correctName, err := DetectCorrectMangaName(slug, 1, domain, writer)
 	if err != nil {
 		return nil, err
 	}
-	baseURL := fmt.Sprintf("https://anime-sama.fr/s2/scans/%s", correctName)
+	baseURL := BuildScanBaseURL(domain, correctName)
 
 	var chapters []string
 
@@ -23,7 +25,7 @@ func GetChapters(slug string, writer io.Writer) ([]string, error) {
 	const maxRetries = 3
 
 	errorsCounter := 0
-	i := 0
+	i := startCheck
 
 	// Reusable http client with timeout
 	client := &http.Client{
@@ -31,6 +33,13 @@ func GetChapters(slug string, writer io.Writer) ([]string, error) {
 	}
 
 	for {
+
+		// If endCheck is specified and we've passed it, stop
+		if endCheck > 0 && i > endCheck {
+			fmt.Fprintln(writer, "[L] Reached enf of specified range")
+			break
+		}
+
 		url := fmt.Sprintf("%s/%d/1.jpg", baseURL, i)
 		fmt.Fprintln(writer, "Checking:", url)
 
@@ -65,7 +74,9 @@ func GetChapters(slug string, writer io.Writer) ([]string, error) {
 		} else {
 			fmt.Fprintln(writer, "Did not find url: ", url)
 			errorsCounter++
-			if errorsCounter >= maxErrorsInARow {
+
+			// Only stop on consecutive errors if no endCheck is specified
+			if endCheck == 0 && errorsCounter >= maxErrorsInARow {
 				// We're assuming there's no more chapters to fetch
 				fmt.Fprintln(writer, "Reached max request failures, resuming...")
 				break
