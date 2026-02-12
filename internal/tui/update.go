@@ -28,6 +28,11 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		m.Height = msg.Height
 		return m, nil
 	case tea.KeyMsg:
+
+		if m.IsDownloading && msg.String() != "ctrl+c" {
+			return m, nil
+		}
+
 		switch msg.String() {
 
 		case "ctrl+c":
