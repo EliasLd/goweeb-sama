@@ -7,23 +7,22 @@ import (
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("226")).Align(lipgloss.Center)
-	labelStyle = lipgloss.NewStyle().Bold(true)
+	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("226")).Align(lipgloss.Center)
+	labelStyle  = lipgloss.NewStyle().Bold(true)
 	logBoxStyle = lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		Padding(1).
-		Width(70).
-		Height(20)
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("240")).
+			Padding(1).
+			Width(70).
+			Height(20)
 )
-
 
 func View(m Model) string {
 	var form strings.Builder
 
 	form.WriteString(titleStyle.Render(m.Title))
 	form.WriteString("\n\n")
-	
+
 	form.WriteString(labelStyle.Render("Nom du manga (remplacer les espaces par des -)"))
 	form.WriteString("\n\n")
 	if m.Cursor == 0 {
@@ -34,10 +33,9 @@ func View(m Model) string {
 	}
 	form.WriteString("\n\n")
 
-	
 	form.WriteString(m.AllCheckbox.View(m.Cursor == 1))
 	form.WriteString("\n\n")
-	
+
 	form.WriteString(labelStyle.Render("Plage de chapitres à télécharger"))
 	form.WriteString("\n\n")
 	// Not active if AllCheckbox is checked
@@ -61,12 +59,21 @@ func View(m Model) string {
 	}
 	form.WriteString("\n\n")
 
-	form.WriteString(m.KeepCheckbox.View(m.Cursor == 4))
+	form.WriteString(labelStyle.Render("Domaine anime-sama (optionnel)"))
+	form.WriteString("\n\n")
+	if m.Cursor == 4 {
+		form.WriteString(m.DomainInput.View())
+	} else {
+		form.WriteString(lipgloss.NewStyle().Faint(true).Render(m.DomainInput.View()))
+	}
+	form.WriteString("\n\n")
+
+	form.WriteString(m.KeepCheckbox.View(m.Cursor == 5))
 	form.WriteString("\n\n")
 
 	if m.DownloadReady {
 		button := "[ Télécharger ]"
-		if m.Cursor == 5 {
+		if m.Cursor == 6 {
 			button = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("226")).Render(button)
 		} else {
 			button = lipgloss.NewStyle().Faint(true).Render(button)
@@ -95,7 +102,6 @@ func View(m Model) string {
 		logs.WriteString("Aucun log pour le moment...")
 	}
 
-	
 	// Feel blank lines
 	for i := len(visibleLogs); i < maxLogs; i++ {
 		logs.WriteString("\n")
@@ -108,13 +114,12 @@ func View(m Model) string {
 	// Center content
 	boxWidth := lipgloss.Width(content)
 	boxHeight := lipgloss.Height(content)
-	horizontalMargin := max(0, (m.Width - boxWidth)/2)
-	verticalMargin := max(0, (m.Height - boxHeight)/2)
+	horizontalMargin := max(0, (m.Width-boxWidth)/2)
+	verticalMargin := max(0, (m.Height-boxHeight)/2)
 
 	boxStyle := lipgloss.NewStyle().
 		MarginTop(verticalMargin).
 		MarginLeft(horizontalMargin)
-	
+
 	return boxStyle.Render(content)
 }
-
