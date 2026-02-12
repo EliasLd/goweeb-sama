@@ -1,11 +1,11 @@
 package tui
 
 import (
-	"fmt"
-	"io"
 	"bufio"
-	"strings"
+	"fmt"
 	app "github.com/EliasLd/scan-scraper/internal/app"
+	"io"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -22,12 +22,17 @@ type setupLogPipeMsg struct {
 
 func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	
+
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
 		return m, nil
 	case tea.KeyMsg:
+
+		if m.IsDownloading && msg.String() != "ctrl+c" {
+			return m, nil
+		}
+
 		switch msg.String() {
 
 		case "ctrl+c":
@@ -41,7 +46,7 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			return m, nil
 
 		case "down", "tab":
-			if m.Cursor < 5 {
+			if m.Cursor < 6 {
 				m.Cursor++
 			}
 			m = updateFocus(m)
@@ -51,22 +56,36 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			switch m.Cursor {
 			case 1: // AllCheckbox
 				m.AllCheckbox.Toggle()
-			case 4: // KeepCheckbox
+			case 5: // KeepCheckbox
 				m.KeepCheckbox.Toggle()
-			case 5: // Download button
+			case 6: // Download button
 				if m.DownloadReady {
-					opts := app.Options {
-						Slug:	m.MangaInput.Value(),
-						All:	m.AllCheckbox.Checked,	
-						ScanDir:m.ScanDirInput.Value(),
-						Cleanup:!m.KeepCheckbox.Checked,
+					opts := app.Options{
+						Slug:         m.MangaInput.Value(),
+						All:          m.AllCheckbox.Checked,
+						ScanDir:      m.ScanDirInput.Value(),
+						Cleanup:      !m.KeepCheckbox.Checked,
+						CustomDomain: strings.TrimSpace(m.DomainInput.Value()),
 					}
 
 					if !opts.All {
+						r := strings.TrimSpace(m.RangeInput.Value())
+
+						// Support:
+						// - "10-20"
+						// - "10-" (open ended)
 						var from, to int
-						_, err := fmt.Sscanf(m.RangeInput.Value(), "%d-%d", &from, &to)
-						if err == nil {
-							opts.Range = [2]int{from, to}
+						if strings.HasSuffix(r, "-") {
+							trim := strings.TrimSuffix(r, "-")
+							_, err := fmt.Sscanf(trim, "%d", &from)
+							if err == nil {
+								opts.Range = [2]int{from, 0}
+							}
+						} else {
+							_, err := fmt.Sscanf(r, "%d-%d", &from, &to)
+							if err == nil {
+								opts.Range = [2]int{from, to}
+							}
 						}
 					}
 
@@ -95,6 +114,11 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.ScanDirInput, cmd = m.ScanDirInput.Update(msg)
 			return m, cmd
+
+		case 4:
+			var cmd tea.Cmd
+			m.DomainInput, cmd = m.DomainInput.Update(msg)
+			return m, cmd
 		}
 
 	case logMsg:
@@ -106,7 +130,7 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			m.Logs = append(m.Logs, styled)
 			m.IsDownloading = false
 		case strings.HasPrefix(logLine, "[L]"):
-			m.Logs = append(m.Logs, logLine)	
+			m.Logs = append(m.Logs, logLine)
 		case strings.HasPrefix(logLine, "[E]"):
 			styled := errorStyle.Render(logLine)
 			m.Logs = append(m.Logs, styled)
@@ -141,6 +165,8 @@ func updateFocus(m Model) Model {
 		}
 	case 3:
 		m.ScanDirInput.Focus()
+	case 4:
+		m.DomainInput.Focus()
 	}
 	return m
 }
@@ -172,7 +198,7 @@ func readOneLogLine(m Model) tea.Cmd {
 		if err := m.scanner.Err(); err != nil {
 			return logMsg(fmt.Sprintf("Error: failed to read log: %v", err))
 		}
-		
+
 		if m.IsDownloading {
 			return logMsg("Finished downloading")
 		}
