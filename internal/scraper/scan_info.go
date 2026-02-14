@@ -1,0 +1,78 @@
+package scraper
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"sort"
+	"strconv"
+	"time"
+)
+
+type ScanInfo struct {
+	MangaName string
+	Chapters  []int
+}
+
+// Fetches scan info using the anime-sama API
+func GetScanInfo(domain, mangaName string, writer io.Writer) (*ScanInfo, error) {
+	// Call the API endpoint
+	apiURL := fmt.Sprintf("%s/s2/scans/get_nb_chap_et_img.php?oeuvre=%s",
+		domain,
+		url.QueryEscape(mangaName),
+	)
+
+	fmt.Fprintf(writer, "[L] Fetching chapter list from API: %s\n", apiURL)
+
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+	}
+
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read API response: %w", err)
+	}
+
+	var data map[string]int
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	// Extract and sort chapter numbers
+	var chapters []int
+	for chapterStr := range data {
+		chapterNum, err := strconv.Atoi(chapterStr)
+		if err != nil {
+			continue
+		}
+		chapters = append(chapters, chapterNum)
+	}
+
+	sort.Ints(chapters)
+
+	fmt.Fprintf(writer, "[L] Found %d chapters\n", len(chapters))
+
+	return &ScanInfo{
+		MangaName: mangaName,
+		Chapters:  chapters,
+	}, nil
+}
