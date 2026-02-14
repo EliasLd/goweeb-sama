@@ -22,7 +22,7 @@ type MangaResult struct {
 // Returns empty string if not found
 func SearchCatalog(domain, query string, writer io.Writer) ([]MangaResult, error) {
 	// Build search URL
-	searchURL := fmt.Sprintf("%s/catalogue/?type=Scans&search=%s",
+	searchURL := fmt.Sprintf("%s/catalogue/?type[]=Scans&search=%s",
 		strings.TrimSuffix(domain, "/"),
 		url.QueryEscape(query),
 	)
