@@ -17,7 +17,7 @@ L'installation est très simple, il suffit d'aller dans l'onglet **Releases** su
 3. Ouvre un terminal (PowerShell ou CMD) dans ce dossier et utilise l'outil
 
 ### Linux / macOS
-1. Télécharge le fichier correspondant à ton système (`goweeb-sama-linux` ou `goweeb-sama-macos`)
+1. Télécharge le fichier correspondant à ton système (`goweeb-sama-linux` ou `goweeb-sama-darwin` pour macos)
 2. Rends-le exécutable : `chmod +x goweeb-sama-*`
 3. (Optionnel) Déplace-le dans `/usr/local/bin` pour l'utiliser depuis n'importe où
 
@@ -25,17 +25,20 @@ L'installation est très simple, il suffit d'aller dans l'onglet **Releases** su
 
 ### Format du nom de manga
 
-**Important** : Le nom du manga doit être écrit en **minuscules** avec les **espaces remplacés par des tirets** (`-`).
+**Important** : Le nom du manga doit être entré **entre guillemets**. Tu peux utiliser n'importe quel terme de recherche (titre français, anglais, ou japonais).
 
 Exemples :
-- "One Piece" → `one-piece`
-- "Jujutsu Kaisen" → `jujutsu-kaisen`
-- "Chainsaw Man" → `chainsaw-man`
+- `"one piece"`
+- `"jujutsu kaisen"`
+- `"chainsaw man"`
+- `"attaque des titans"`
+
+Si plusieurs résultats correspondent à ta recherche, l'outil te proposera de choisir le bon manga dans une liste interactive.
 
 ### Syntaxe de base
 
 ```bash
-goweeb [options] <manga-slug>
+goweeb [options] "nom-du-manga"
 ```
 
 ### Options disponibles
@@ -52,50 +55,54 @@ goweeb [options] <manga-slug>
 
 #### Télécharger tous les chapitres d'un manga
 ```bash
-goweeb --all one-piece
+goweeb --all "one piece"
 # ou
-goweeb -a one-piece
+goweeb -a "jujutsu kaisen"
 ```
 
 #### Télécharger une plage de chapitres
 ```bash
 # Chapitres 10 à 77
-goweeb --range 10-77 jujutsu-kaisen
+goweeb --range 10-77 "jujutsu kaisen"
 
 # Raccourci
-goweeb -r 10-50 one-piece
+goweeb -r 10-50 "one piece"
 
 # Du chapitre 14 jusqu'au dernier disponible
-goweeb -r 14- chainsaw-man
+goweeb -r 14- "chainsaw man"
 ```
 
 #### Spécifier un dossier de destination
 ```bash
 # Les PDF seront sauvegardés dans le dossier "mes-mangas"
-goweeb -d mes-mangas --all naruto
+goweeb -d mes-mangas --all "naruto"
 
 # Ou avec le chemin complet
-goweeb --scan-dir ~/Documents/Mangas -r 1-100 one-piece
+goweeb --scan-dir ~/Documents/Mangas -r 1-100 "one piece"
 ```
 
 #### Spécifier un domaine personnalisé
 ```bash
 # Si le domaine anime-sama change
-goweeb -u https://anime-sama.fr --all one-piece
+goweeb -u https://anime-sama.fr --all "one piece"
 ```
 
 #### Combinaison d'options
 ```bash
-# Télécharge les chapitres 1 à 50 de One piece, dans le dossier "scans" sur windows 
-# en spécifiant un domaine de anime-sama personalisé
-goweeb -r 1-50 -d 'C:\Users\<nom-de-ton-utilisateur>\scans' -u https://anime-sama.tv one-piece
+# Télécharge les chapitres 1 à 50 de One Piece, dans le dossier "scans" sur Windows 
+# en spécifiant un domaine anime-sama personnalisé
+goweeb -r 1-50 -d 'C:\Users\<nom-de-ton-utilisateur>\scans' -u https://anime-sama.tv "one piece"
 ```
 
 ### Conseils
 
+> [!TIP]
+> - La recherche utilise directement le moteur de recherche d'anime-sama, tu peux donc utiliser n'importe quel nom (français, anglais, japonais)
+> - Si plusieurs versions d'un scan existent (ex: couleur/noir et blanc), l'outil te demandera laquelle télécharger
+> - N'oublie pas les guillemets autour du nom du manga !
+
 > [!WARNING] 
-> - Si jamais le manga n'est pas trouvé, peut-être qu'il faut utiliser son nom en japonais. Par exemple, `l'attaque des titans` porte le nom `shingeki no kyojin` sur anime-sama, il faut donc écrire `shingeki-no-kyojin` dans la commande
-> - Garde bien en tête que le domaine d'anime-sama change pour des raisons évidentes.. donc n'hésites pas à vérifier [anime-sama.pw](https://anime-sama.pw) pour vérifier quel domaine est actif. Tu peux ensuite le spécifier avec l'argument `-u` comme présenté au dessus.
+> Garde bien en tête que le domaine d'anime-sama change pour des raisons évidentes... donc n'hésite pas à vérifier [anime-sama.pw](https://anime-sama.pw) pour vérifier quel domaine est actif. Tu peux ensuite le spécifier avec l'argument `-u` comme présenté ci-dessus.
 
 ---
 
@@ -113,7 +120,7 @@ Installation is very simple, just go to the **Releases** tab on the right side o
 3. Open a terminal (PowerShell or CMD) in that folder and use the tool
 
 ### Linux / macOS
-1. Download the file corresponding to your system (`goweeb-sama-linux` or `goweeb-sama-macos`)
+1. Download the file corresponding to your system (`goweeb-sama-linux` or `goweeb-sama-darwin` for macos)
 2. Make it executable: `chmod +x goweeb-sama-*`
 3. (Optional) Move it to `/usr/local/bin` to use it from anywhere
 
@@ -121,17 +128,20 @@ Installation is very simple, just go to the **Releases** tab on the right side o
 
 ### Manga name format
 
-**Important**: The manga name must be written in **lowercase** with **spaces replaced by hyphens** (`-`).
+**Important**: The manga name must be entered **in quotes**. You can use any search term (French, English, or Japanese title).
 
 Examples:
-- "One Piece" → `one-piece`
-- "Jujutsu Kaisen" → `jujutsu-kaisen`
-- "Chainsaw Man" → `chainsaw-man`
+- `"one piece"`
+- `"jujutsu kaisen"`
+- `"chainsaw man"`
+- `"attack on titan"`
+
+If multiple results match your search, the tool will let you choose the correct manga from an interactive list.
 
 ### Basic syntax
 
 ```bash
-goweeb [options] <manga-slug>
+goweeb [options] "manga-name"
 ```
 
 ### Available options
@@ -148,53 +158,57 @@ goweeb [options] <manga-slug>
 
 #### Download all chapters of a manga
 ```bash
-goweeb --all one-piece
+goweeb --all "one piece"
 # or
-goweeb -a one-piece
+goweeb -a "jujutsu kaisen"
 ```
 
 #### Download a range of chapters
 ```bash
 # Chapters 10 to 77
-goweeb --range 10-77 jujutsu-kaisen
+goweeb --range 10-77 "jujutsu kaisen"
 
 # Shortcut
-goweeb -r 10-50 one-piece
+goweeb -r 10-50 "one piece"
 
 # From chapter 14 to the last available
-goweeb -r 14- chainsaw-man
+goweeb -r 14- "chainsaw man"
 ```
 
 #### Specify a destination folder
 ```bash
 # PDFs will be saved in the "my-mangas" folder
-goweeb -d my-mangas --all naruto
+goweeb -d my-mangas --all "naruto"
 
 # Or with the full path
-goweeb --scan-dir ~/Documents/Mangas -r 1-100 one-piece
+goweeb --scan-dir ~/Documents/Mangas -r 1-100 "one piece"
 ```
 
 #### Specify a custom domain
 ```bash
 # If the anime-sama domain changes
-goweeb -u https://anime-sama.fr --all one-piece
+goweeb -u https://anime-sama.fr --all "one piece"
 ```
 
 #### Combining options
 ```bash
 # Download chapters 1 to 50 of One Piece, in the "scans" folder on Windows
 # while specifying a custom anime-sama domain
-goweeb -r 1-50 -d 'C:\Users\<your-username>\scans' -u https://anime-sama.tv one-piece
+goweeb -r 1-50 -d 'C:\Users\<your-username>\scans' -u https://anime-sama.tv "one piece"
 ```
 
 ### Tips
 
+> [!TIP]
+> - The search uses anime-sama's search engine directly, so you can use any name (French, English, Japanese)
+> - If multiple scan versions exist (e.g., color/black and white), the tool will ask which one to download
+> - Don't forget the quotes around the manga name!
+
 > [!WARNING] 
-> - If the manga is not found, you might need to use its Japanese name. For example, `Attack on Titan` is named `shingeki no kyojin` on anime-sama, so you need to write `shingeki-no-kyojin` in the command
-> - Keep in mind that the anime-sama domain changes for obvious reasons... so don't hesitate to check [anime-sama.pw](https://anime-sama.pw) to verify which domain is active. You can then specify it with the `-u` argument as shown above.
+> Keep in mind that the anime-sama domain changes for obvious reasons... so don't hesitate to check [anime-sama.pw](https://anime-sama.pw) to verify which domain is active. You can then specify it with the `-u` argument as shown above.
 
 ---
 
-## 🙏 Crédits
+## Crédits
 
-Merci beaucoup à Anime Sama pour leur travail colossal.
+Merci beaucoup à Anime Sama et leur travail colossal sans qui ce projet ne pourrait exister <3

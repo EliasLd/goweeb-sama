@@ -6,61 +6,62 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
-// Downloads all pages of a chapter
-// ans saves them into destDir.
-func DownloadChapter(slug, chapter, destDir, domain string, writer io.Writer) error {
-	correctName, err := DetectCorrectMangaName(slug, atoiSafe(chapter), domain, writer)
-	if err != nil {
-		fmt.Fprintf(writer, "[E] Could not detect proper name for %s: %v", slug, err)
-		return err
-	}
-
-	baseURL := BuildScanBaseURL(domain, correctName)
+// DownloadChapterFromBaseURL downloads chapter images using an exact base URL
+func DownloadChapterFromBaseURL(baseURL, chapter, destDir string, writer io.Writer) error {
 	chapterURL := fmt.Sprintf("%s/%s", baseURL, chapter)
 
 	const defaultDirPerm = 0755
-	// Creates dest directory if needed
 	if err := os.MkdirAll(destDir, defaultDirPerm); err != nil {
-		fmt.Fprintf(writer, "[E] Failed to create destination folder: %v", err)
-		return fmt.Errorf("Failed to create destDir: %v", err)
+		return fmt.Errorf("failed to create destDir: %w", err)
 	}
 
-	fmt.Fprintln(writer, "Using directory: ", destDir)
+	fmt.Fprintf(writer, "[L] Downloading from: %s\n", chapterURL)
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
 	for page := 1; ; page++ {
 		imgURL := fmt.Sprintf("%s/%d.jpg", chapterURL, page)
-		fmt.Fprintln(writer, "Downloading: ", imgURL)
 
-		resp, err := http.Get(imgURL)
+		req, err := http.NewRequest("GET", imgURL, nil)
 		if err != nil {
-			fmt.Fprintf(writer, "HTTP.GET failed: %v", err)
-			return fmt.Errorf("HTTP.GET failed: %v", err)
+			return fmt.Errorf("failed to create request: %w", err)
 		}
-		defer resp.Body.Close()
+
+		req.Header.Set("User-Agent", "Mozilla/5.0")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("HTTP GET failed: %w", err)
+		}
 
 		if resp.StatusCode != http.StatusOK {
-			fmt.Fprintln(writer, "[L] No more pages or invalid response: ", resp.StatusCode)
-			// Stop if an image is missing.
-			// It probably means that we reached the
-			// end of the current chapter.
+			resp.Body.Close()
+			fmt.Fprintf(writer, "[L] No more pages (status %d at page %d)\n", resp.StatusCode, page)
 			break
 		}
 
-		// Save jpg file with 3
 		imgPath := filepath.Join(destDir, fmt.Sprintf("%03d.jpg", page))
 		outFile, err := os.Create(imgPath)
 		if err != nil {
-			fmt.Fprintf(writer, "[E] Failed to create image file: %s", imgPath)
-			return fmt.Errorf("Failed to create image file: %v", err)
+			resp.Body.Close()
+			return fmt.Errorf("failed to create image file: %w", err)
 		}
 
 		_, err = io.Copy(outFile, resp.Body)
 		outFile.Close()
+		resp.Body.Close()
+
 		if err != nil {
-			fmt.Fprintf(writer, "[E] Failed to save image: %s", outFile)
-			return fmt.Errorf("Failed to save image: %v", err)
+			return fmt.Errorf("failed to save image: %w", err)
 		}
+
+		fmt.Fprintf(writer, "[L] Downloaded page %d\n", page)
 	}
+
 	return nil
 }
