@@ -18,17 +18,26 @@ var (
 )
 
 func View(m Model) string {
+	// Show selection screen if active
+	if m.State == StateMangaSelection || m.State == StateScanSelection {
+		return m.SelectionModel.View()
+	}
+
+	// Show form otherwise
+	return viewForm(m)
+}
+
+func viewForm(m Model) string {
 	var form strings.Builder
 
 	form.WriteString(titleStyle.Render(m.Title))
 	form.WriteString("\n\n")
 
-	form.WriteString(labelStyle.Render("Nom du manga (remplacer les espaces par des -)"))
+	form.WriteString(labelStyle.Render("Nom du manga (espaces autorisés)"))
 	form.WriteString("\n\n")
 	if m.Cursor == 0 {
 		form.WriteString(m.MangaInput.View())
 	} else {
-		//Faint field when unfocused
 		form.WriteString(lipgloss.NewStyle().Faint(true).Render(m.MangaInput.View()))
 	}
 	form.WriteString("\n\n")
@@ -38,7 +47,6 @@ func View(m Model) string {
 
 	form.WriteString(labelStyle.Render("Plage de chapitres à télécharger"))
 	form.WriteString("\n\n")
-	// Not active if AllCheckbox is checked
 	if m.AllCheckbox.Checked {
 		form.WriteString(lipgloss.NewStyle().Faint(true).Render(m.RangeInput.View()))
 		form.WriteString("\n")
@@ -82,9 +90,8 @@ func View(m Model) string {
 		form.WriteString("\n\n")
 	}
 
-	// Footer
 	footerStyle := lipgloss.NewStyle().Faint(true)
-	form.WriteString(footerStyle.Render("↑/↓ pour naviguer, espace ou entrée pour cocher, Ctrl+C pour quitter"))
+	form.WriteString(footerStyle.Render("↑/↓ pour naviguer, espace ou entrée pour cocher, Ctrl+C ou Esc pour quitter"))
 
 	var logs strings.Builder
 	const maxLogs = 18
@@ -102,7 +109,6 @@ func View(m Model) string {
 		logs.WriteString("Aucun log pour le moment...")
 	}
 
-	// Feel blank lines
 	for i := len(visibleLogs); i < maxLogs; i++ {
 		logs.WriteString("\n")
 	}
@@ -111,7 +117,6 @@ func View(m Model) string {
 
 	content := lipgloss.JoinHorizontal(lipgloss.Top, form.String(), logsView)
 
-	// Center content
 	boxWidth := lipgloss.Width(content)
 	boxHeight := lipgloss.Height(content)
 	horizontalMargin := max(0, (m.Width-boxWidth)/2)
