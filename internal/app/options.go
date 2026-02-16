@@ -16,6 +16,7 @@ type Options struct {
 	ScanDir      string
 	Cleanup      bool
 	CustomDomain string // custom domain override
+	Debug        bool
 
 	MangaURL string
 	ScanPath string
@@ -40,6 +41,8 @@ func ParseFlags() Options {
 	flag.StringVar(&customDomain, "domain", "", "Override anime-sama domain (e.g., https://anime-sama.tv)")
 	flag.StringVar(&customDomain, "u", "", "Shorthand for --domain")
 
+	debugFlag := flag.Bool("debug", false, "Enable verbose debug logging")
+
 	flag.Parse()
 
 	// Expecting slug (manga title) as a positional argument
@@ -56,6 +59,7 @@ func ParseFlags() Options {
 	dir := scanDir
 	keepImages := *keepImagesFlag || *keepImagesShort
 	domain := customDomain
+	debug := *debugFlag
 
 	// Normalize domain (remove trailing slash, ensure https://)
 	if domain != "" {
@@ -113,5 +117,6 @@ func ParseFlags() Options {
 		ScanDir:      dir,
 		Cleanup:      !keepImages,
 		CustomDomain: domain,
+		Debug:        debug,
 	}
 }

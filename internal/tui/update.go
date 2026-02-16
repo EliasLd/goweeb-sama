@@ -8,6 +8,7 @@ import (
 
 	"github.com/EliasLd/scan-scraper/internal/app"
 	"github.com/EliasLd/scan-scraper/internal/fetch"
+	"github.com/EliasLd/scan-scraper/internal/logger"
 	"github.com/EliasLd/scan-scraper/internal/scraper"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -62,7 +63,6 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		// If only one result, auto-select
 		if len(msg.results) == 1 {
 			m.SelectedMangaURL = msg.results[0].URL
-			m.Logs = append(m.Logs, fmt.Sprintf("[L] Auto-selected: %s", msg.results[0].Title))
 			return m, fetchScanPaths(m.SelectedMangaURL)
 		}
 
@@ -87,7 +87,6 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		// If only one scan path, auto-select
 		if len(msg.paths) == 1 {
 			m.SelectedScanPath = msg.paths[0].Path
-			m.Logs = append(m.Logs, fmt.Sprintf("[L] Auto-selected: %s", msg.paths[0].Label))
 			return m, startDownload(m)
 		}
 
@@ -152,7 +151,7 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			case 6: // Download button
 				if m.DownloadReady {
 					// Start catalog search
-					m.Logs = append(m.Logs, fmt.Sprintf("[L] Searching for: %s", m.MangaInput.Value()))
+					m.Logs = append(m.Logs, fmt.Sprintf("Searching for: %s", m.MangaInput.Value()))
 					return m, searchCatalog(m.MangaInput.Value(), m.DomainInput.Value())
 				}
 			}
@@ -189,11 +188,17 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			styled := highlightStyle.Render(string(msg))
 			m.Logs = append(m.Logs, styled)
 			m.IsDownloading = false
-		case strings.HasPrefix(logLine, "[L]"):
-			m.Logs = append(m.Logs, logLine)
-		case strings.HasPrefix(logLine, "[E]"):
+		case strings.HasPrefix(logLine, "[DEBUG]"):
+			// Skip debug logs in TUI
+		case strings.Contains(logLine, "[ERROR]"):
 			styled := errorStyle.Render(logLine)
 			m.Logs = append(m.Logs, styled)
+		case strings.Contains(logLine, "[!]"):
+			// Warning logs
+			m.Logs = append(m.Logs, logLine)
+		default:
+			// Info level logs
+			m.Logs = append(m.Logs, logLine)
 		}
 		return m, readOneLogLine(m)
 
@@ -220,12 +225,12 @@ func handleSelectionUpdate(msg tea.Msg, m Model) (Model, tea.Cmd) {
 		if m.State == StateMangaSelection {
 			m.SelectedMangaURL = m.SelectionModel.Selected
 			m.State = StateForm
-			m.Logs = append(m.Logs, "[L] Manga selected, fetching scan versions...")
+			m.Logs = append(m.Logs, "Manga selected, fetching scan versions...")
 			return m, fetchScanPaths(m.SelectedMangaURL)
 		} else if m.State == StateScanSelection {
 			m.SelectedScanPath = m.SelectionModel.Selected
 			m.State = StateForm
-			m.Logs = append(m.Logs, "[L] Scan version selected, starting download...")
+			m.Logs = append(m.Logs, "Scan version selected, starting download...")
 			return m, startDownload(m)
 		}
 	}
@@ -233,7 +238,7 @@ func handleSelectionUpdate(msg tea.Msg, m Model) (Model, tea.Cmd) {
 	// Check if cancelled
 	if m.SelectionModel.Cancelled {
 		m.State = StateForm
-		m.Logs = append(m.Logs, "[L] Selection cancelled")
+		m.Logs = append(m.Logs, "Selection cancelled")
 		return m, nil
 	}
 
@@ -265,15 +270,17 @@ func updateFocus(m Model) Model {
 
 func searchCatalog(query, customDomain string) tea.Cmd {
 	return func() tea.Msg {
-		domain := fetch.GetActiveDomain(customDomain, io.Discard)
-		results, err := scraper.SearchCatalog(domain, query, io.Discard)
+		log := logger.New(io.Discard, logger.LevelInfo)
+		domain := fetch.GetActiveDomain(customDomain, log)
+		results, err := scraper.SearchCatalog(domain, query, log)
 		return catalogSearchResultMsg{results: results, err: err}
 	}
 }
 
 func fetchScanPaths(mangaURL string) tea.Cmd {
 	return func() tea.Msg {
-		paths, err := scraper.GetAllScanPaths(mangaURL, io.Discard)
+		log := logger.New(io.Discard, logger.LevelInfo)
+		paths, err := scraper.GetAllScanPaths(mangaURL, log)
 		return scanPathResultMsg{paths: paths, err: err}
 	}
 }
@@ -313,7 +320,8 @@ func startDownload(m Model) tea.Cmd {
 		pr, pw := io.Pipe()
 
 		go func() {
-			app.RunWithWorkflow(opts, pw) // New function that skips catalog search
+			log := logger.New(pw, logger.LevelInfo)
+			app.RunWithWorkflow(opts, log) // New function that skips catalog search
 			pw.Close()
 		}()
 

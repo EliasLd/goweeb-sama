@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/EliasLd/scan-scraper/internal/logger"
 )
 
 type MangaResult struct {
@@ -20,14 +22,14 @@ type MangaResult struct {
 
 // Searches anime-sama catalog and returns the manga page URL
 // Returns empty string if not found
-func SearchCatalog(domain, query string, writer io.Writer) ([]MangaResult, error) {
+func SearchCatalog(domain, query string, log *logger.Logger) ([]MangaResult, error) {
 	// Build search URL
 	searchURL := fmt.Sprintf("%s/catalogue/?type[]=Scans&search=%s",
 		strings.TrimSuffix(domain, "/"),
 		url.QueryEscape(query),
 	)
 
-	fmt.Fprintf(writer, "[L] Searching catalog: %s\n", searchURL)
+	log.Debug("Searching catalog: %s\n", searchURL)
 
 	client := &http.Client{
 		Timeout: 15 * time.Second,
@@ -64,7 +66,7 @@ func SearchCatalog(domain, query string, writer io.Writer) ([]MangaResult, error
 	matches := cardRegex.FindAllStringSubmatch(html, -1)
 
 	if len(matches) == 0 {
-		fmt.Fprintln(writer, "[W] No manga found in catalog")
+		log.Warn("No manga found in catalog")
 		return nil, nil
 	}
 
@@ -78,33 +80,33 @@ func SearchCatalog(domain, query string, writer io.Writer) ([]MangaResult, error
 		}
 	}
 
-	fmt.Fprintf(writer, "[L] Found %d results(s)\n", len(results))
+	log.Info("Found %d results(s)\n", len(results))
 
 	return results, nil
 }
 
-func PromptUserToSelectManga(results []MangaResult, writer io.Writer) (string, error) {
+func PromptUserToSelectManga(results []MangaResult, log *logger.Logger) (string, error) {
 	if len(results) == 0 {
 		return "", fmt.Errorf("no results to choose from")
 	}
 
 	if len(results) == 1 {
-		fmt.Fprintf(writer, "[L] Only one result found: %s\n", results[0].Title)
-		fmt.Fprintf(writer, "[L] Auto-selecting: %s\n", results[0].URL)
+		log.Debug("Only one result found: %s\n", results[0].Title)
+		log.Debug("Auto-selecting: %s\n", results[0].URL)
 		return results[0].URL, nil
 	}
 
 	// Display all results
-	fmt.Fprintln(writer, "\nMultiple results found:")
+	log.Info("\nMultiple results found:\n")
 	for i, result := range results {
-		fmt.Fprintf(writer, "[%d] - %s\n", i+1, result.Title)
+		log.Info("[%d] - %s\n", i+1, result.Title)
 	}
-	fmt.Fprintln(writer)
+	log.Info("")
 
 	// Prompt user
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Fprintf(writer, "Select a manga (1-%d) or 0 to cancel: ", len(results))
+		log.Info("Select a manga (1-%d) or 0 to cancel: ", len(results))
 
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -115,23 +117,23 @@ func PromptUserToSelectManga(results []MangaResult, writer io.Writer) (string, e
 
 		choice, err := strconv.Atoi(input)
 		if err != nil {
-			fmt.Fprintln(writer, "Invalid input. Please enter a number.")
+			log.Warn("Invalid input. Please enter a number.")
 			continue
 		}
 
 		if choice == 0 {
-			fmt.Fprintln(writer, "[L] Selection cancelled by user")
+			log.Debug("Selection cancelled by user")
 			return "", nil
 		}
 
 		if choice < 1 || choice > len(results) {
-			fmt.Fprintf(writer, "Invalid choice. Please enter a number between 1 and %d.\n", len(results))
+			log.Warn("Invalid choice. Please enter a number between 1 and %d.\n", len(results))
 			continue
 		}
 
 		selected := results[choice-1]
-		fmt.Fprintf(writer, "[L] Selected: %s\n", selected.Title)
-		fmt.Fprintf(writer, "[L] URL: %s\n", selected.URL)
+		log.Info("Selected: %s\n", selected.Title)
+		log.Debug("URL: %s\n", selected.URL)
 		return selected.URL, nil
 	}
 }

@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/EliasLd/scan-scraper/internal/logger"
 )
 
 type ScanInfo struct {
@@ -17,14 +19,14 @@ type ScanInfo struct {
 }
 
 // Fetches scan info using the anime-sama API
-func GetScanInfo(domain, mangaName string, writer io.Writer) (*ScanInfo, error) {
+func GetScanInfo(domain, mangaName string, log *logger.Logger) (*ScanInfo, error) {
 	// Call the API endpoint
 	apiURL := fmt.Sprintf("%s/s2/scans/get_nb_chap_et_img.php?oeuvre=%s",
 		domain,
 		url.QueryEscape(mangaName),
 	)
 
-	fmt.Fprintf(writer, "[L] Fetching chapter list from API: %s\n", apiURL)
+	log.Debug("Fetching chapter list from API: %s\n", apiURL)
 
 	client := &http.Client{
 		Timeout: 15 * time.Second,
@@ -69,7 +71,7 @@ func GetScanInfo(domain, mangaName string, writer io.Writer) (*ScanInfo, error) 
 
 	sort.Ints(chapters)
 
-	fmt.Fprintf(writer, "[L] Found %d chapters\n", len(chapters))
+	log.Info("Found %d chapters\n", len(chapters))
 
 	return &ScanInfo{
 		MangaName: mangaName,

@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/EliasLd/scan-scraper/internal/logger"
 )
 
 // DownloadChapterFromBaseURL downloads chapter images using an exact base URL
-func DownloadChapterFromBaseURL(baseURL, chapter, destDir string, writer io.Writer) error {
+func DownloadChapterFromBaseURL(baseURL, chapter, destDir string, log *logger.Logger) error {
 	chapterURL := fmt.Sprintf("%s/%s", baseURL, chapter)
 
 	const defaultDirPerm = 0755
@@ -18,7 +20,7 @@ func DownloadChapterFromBaseURL(baseURL, chapter, destDir string, writer io.Writ
 		return fmt.Errorf("failed to create destDir: %w", err)
 	}
 
-	fmt.Fprintf(writer, "[L] Downloading from: %s\n", chapterURL)
+	log.Debug("Downloading from: %s\n", chapterURL)
 
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -41,7 +43,7 @@ func DownloadChapterFromBaseURL(baseURL, chapter, destDir string, writer io.Writ
 
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
-			fmt.Fprintf(writer, "[L] No more pages (status %d at page %d)\n", resp.StatusCode, page)
+			log.Debug("No more pages (status %d at page %d)\n", resp.StatusCode, page)
 			break
 		}
 
@@ -60,7 +62,7 @@ func DownloadChapterFromBaseURL(baseURL, chapter, destDir string, writer io.Writ
 			return fmt.Errorf("failed to save image: %w", err)
 		}
 
-		fmt.Fprintf(writer, "[L] Downloaded page %d\n", page)
+		log.Debug("Downloaded page %d\n", page)
 	}
 
 	return nil
