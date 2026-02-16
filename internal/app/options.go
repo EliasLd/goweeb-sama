@@ -16,6 +16,9 @@ type Options struct {
 	ScanDir      string
 	Cleanup      bool
 	CustomDomain string // custom domain override
+
+	MangaURL string
+	ScanPath string
 }
 
 func ParseFlags() Options {

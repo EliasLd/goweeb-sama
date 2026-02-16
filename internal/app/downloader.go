@@ -157,3 +157,104 @@ func Run(opts Options, writer io.Writer) {
 		os.RemoveAll(rootImagesDir)
 	}
 }
+
+// Runs the download with pre-selected manga URL and scan path (used by TUI)
+func RunWithWorkflow(opts Options, writer io.Writer) {
+	if !opts.All && opts.Range == [2]int{} {
+		fmt.Fprintln(writer, "[E] Please use --all or --range to download chapters.")
+		return
+	}
+
+	activeDomain := fetch.GetActiveDomain(opts.CustomDomain, writer)
+
+	// Use pre-selected manga URL and scan path (no prompts)
+	scanPageURL := scraper.CleanURL(opts.MangaURL, opts.ScanPath)
+
+	mangaName, err := scraper.ExtractMangaName(scanPageURL, writer)
+	if err != nil {
+		fmt.Fprintf(writer, "[E] Failed to extract manga name: %v\n", err)
+		return
+	}
+
+	scanInfo, err := scraper.GetScanInfo(activeDomain, mangaName, writer)
+	if err != nil {
+		fmt.Fprintf(writer, "[E] Failed to get scan info: %v\n", err)
+		return
+	}
+
+	// Filter chapters based on user's range
+	chapters := scanInfo.Chapters
+
+	if opts.Range != [2]int{} {
+		var filtered []int
+		for _, ch := range chapters {
+			if opts.Range[1] == 0 {
+				if ch >= opts.Range[0] {
+					filtered = append(filtered, ch)
+				}
+			} else {
+				if ch >= opts.Range[0] && ch <= opts.Range[1] {
+					filtered = append(filtered, ch)
+				}
+			}
+		}
+		chapters = filtered
+
+		if opts.Range[1] == 0 {
+			fmt.Fprintf(writer, "[L] Filtered to %d chapters from %d onwards\n", len(chapters), opts.Range[0])
+		} else {
+			fmt.Fprintf(writer, "[L] Filtered to %d chapters (%d-%d)\n", len(chapters), opts.Range[0], opts.Range[1])
+		}
+	}
+
+	if len(chapters) == 0 {
+		fmt.Fprintln(writer, "[W] No chapters found in range.")
+		return
+	}
+
+	fmt.Fprintf(writer, "[L] Downloading %d chapters...\n", len(chapters))
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Fprintf(writer, "[E] Failed to get home dir: %v\n", err)
+		return
+	}
+
+	baseURL := fmt.Sprintf("%s/s2/scans/%s", activeDomain, scanInfo.MangaName)
+
+	for _, chNum := range chapters {
+		chStr := fmt.Sprintf("%d", chNum)
+		fmt.Fprintf(writer, "[L] Downloading chapter %s...\n", chStr)
+
+		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chStr)
+
+		err = fetch.DownloadChapterFromBaseURL(baseURL, chStr, imageDir, writer)
+		if err != nil {
+			fmt.Fprintf(writer, "[E] Failed to download chapter %s: %v\n", chStr, err)
+			continue
+		}
+
+		err = os.MkdirAll(opts.ScanDir, os.ModePerm)
+		if err != nil {
+			fmt.Fprintf(writer, "[E] Failed to create output dir: %v\n", err)
+			return
+		}
+
+		pdfPath := filepath.Join(opts.ScanDir, fmt.Sprintf("%s_%s.pdf", mangaName, chStr))
+		err = convert.ImagesToPDF(imageDir, pdfPath, opts.Cleanup, writer)
+		if err != nil {
+			fmt.Fprintf(writer, "[E] Failed to create PDF: %v\n", err)
+			continue
+		}
+
+		fmt.Fprintf(writer, "[L] Chapter %s saved as %s\n", chStr, pdfPath)
+	}
+
+	if opts.Cleanup {
+		rootImagesDir := filepath.Join(homeDir, "Images", opts.Slug)
+		fmt.Fprintf(writer, "[L] Cleaning up: %s\n", rootImagesDir)
+		os.RemoveAll(rootImagesDir)
+	}
+
+	fmt.Fprintf(writer, "Finished downloading")
+}
