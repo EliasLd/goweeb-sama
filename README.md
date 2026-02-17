@@ -4,24 +4,50 @@
 > English below but kind of useless since this utility is intended to dynamically download
 > manga scans in **french** on a **french** website :)
 
+![goweeb TUI demo](./assets/demo.gif)
+
 **goweeb-sama** est un outil très rapide permettant de télécharger proprement les scans de ton manga préféré
 depuis le site **anime-sama** (qui fait un excellent travail d'ailleurs, merci à vous).
 
 ## Installation
 
-L'installation est très simple, il suffit d'aller dans l'onglet **Releases** sur la droite de l'interface GitHub et de télécharger la dernière version de l'outil pour ton système d'exploitation.
+L'installation est très simple, il suffit d'aller dans l'onglet **[Releases](https://github.com/EliasLd/goweeb-sama/releases/latest)** et de télécharger la dernière version **TUI** de l'outil pour ton système d'exploitation.
 
 ### Windows
-1. Télécharge le fichier `goweeb-sama-windows.exe` (ou similaire)
-2. Place-le dans un dossier de ton choix
+1. Télécharge l'archive pour windows
+2. Place l'exécutable dans un dossier de ton choix
 3. Ouvre un terminal (PowerShell ou CMD) dans ce dossier et utilise l'outil
 
 ### Linux / macOS
-1. Télécharge le fichier correspondant à ton système (`goweeb-sama-linux` ou `goweeb-sama-darwin` pour macos)
-2. Rends-le exécutable : `chmod +x goweeb-sama-*`
+1. Télécharge l'archive correspondant à ton système (*darwin* pour macos)
+2. Rends-le exécutable : `chmod +x goweeb`
 3. (Optionnel) Déplace-le dans `/usr/local/bin` pour l'utiliser depuis n'importe où
 
 ## Utilisation
+
+**goweeb-sama** est disponible en deux versions :
+
+### Interface graphique (TUI) - Recommandé pour les débutants
+
+Lance simplement l'exécutable TUI :
+
+```bash
+# Linux / macOS
+./goweeb
+
+# Windows
+goweeb.exe
+```
+
+Laisse-toi guider par l'interface interactive !
+
+- Saisis le nom du manga que tu recherches
+- Choisis parmi les résultats trouvés
+- Sélectionne la version (couleur/noir et blanc, VF/VA)
+- Configure tes options de téléchargement
+- Lance le téléchargement et suis la progression en temps réel
+
+### Ligne de commande (CLI) - Pour les utilisateurs avancés
 
 ### Format du nom de manga
 
@@ -112,21 +138,46 @@ goweeb -r 1-50 -d 'C:\Users\<nom-de-ton-utilisateur>\scans' -u https://anime-sam
 
 ## Installation
 
-Installation is very simple, just go to the **Releases** tab on the right side of the GitHub interface and download the latest version of the tool for your operating system.
+Installation is very simple, just go to the **Releases** tab on the right side of the GitHub interface and download the latest **TUI** version of the tool for your operating system.
 
 ### Windows
-1. Download the file `goweeb-sama-windows.exe` (or similar)
+1. Download the Windows archive
 2. Place it in a folder of your choice
 3. Open a terminal (PowerShell or CMD) in that folder and use the tool
 
 ### Linux / macOS
-1. Download the file corresponding to your system (`goweeb-sama-linux` or `goweeb-sama-darwin` for macos)
-2. Make it executable: `chmod +x goweeb-sama-*`
+1. Download the archive corresponding to your system (*darwin* for macos)
+2. Make it executable: `chmod +x goweeb`
 3. (Optional) Move it to `/usr/local/bin` to use it from anywhere
 
 ## Usage
 
+**goweeb-sama** is available in two versions:
+
+### Graphical Interface (TUI) - Recommended for beginners
+
+Simply launch the TUI executable:
+
+```bash
+# Linux / macOS
+./goweeb
+
+# Windows
+goweeb.exe
+```
+
+Let the interactive interface guide you!
+
+- Enter the manga name you're searching for
+- Choose from the search results
+- Select the version (color/black and white, VF/VA)
+- Configure your download options
+- Start downloading and follow the progress in real-time
+
+### Command Line (CLI) - For advanced users
+
 ### Manga name format
+
 
 **Important**: The manga name must be entered **in quotes**. You can use any search term (French, English, or Japanese title).
 
