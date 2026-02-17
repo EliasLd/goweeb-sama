@@ -2,7 +2,9 @@ package tui
 
 import (
 	"fmt"
+	"io"
 
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -13,10 +15,42 @@ type SelectionItem struct {
 	Value string
 }
 
+// Implements list.Item interface
+func (i SelectionItem) FilterValue() string { return i.Label }
+
+// Custom item delegate for styling
+type itemDelegate struct{}
+
+func (d itemDelegate) Height() int                             { return 1 }
+func (d itemDelegate) Spacing() int                            { return 0 }
+func (d itemDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	i, ok := listItem.(SelectionItem)
+	if !ok {
+		return
+	}
+
+	str := fmt.Sprintf("%d. %s", index+1, i.Label)
+
+	// Highlight selected item
+	if index == m.Index() {
+		s := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("226")).
+			Bold(true).
+			Render("> " + str)
+		fmt.Fprint(w, s)
+	} else {
+		s := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Render(" " + str)
+		fmt.Fprint(w, s)
+	}
+}
+
 // Represents a generic selection screen
 type SelectionModel struct {
 	Title     string
-	Items     []SelectionItem
+	list      list.Model
 	Cursor    int
 	Selected  string
 	Cancelled bool
@@ -25,10 +59,32 @@ type SelectionModel struct {
 }
 
 func NewSelectionModel(title string, items []SelectionItem) SelectionModel {
+	listItem := make([]list.Item, len(items))
+	for i, item := range items {
+		listItem[i] = item
+	}
+
+	// Create list
+	delegate := itemDelegate{}
+	l := list.New(listItem, delegate, 60, 14)
+	l.Title = title
+	l.SetShowStatusBar(false)
+	l.SetShowPagination(true)
+	l.SetShowHelp(false)
+	l.SetFilteringEnabled(true)
+
+	l.Styles.Title = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("226")).
+		Padding(0, 0, 1, 0)
+
+	l.Styles.StatusBar = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Padding(0, 0, 1, 0)
+
 	return SelectionModel{
 		Title:     title,
-		Items:     items,
-		Cursor:    0,
+		list:      l,
 		Selected:  "",
 		Cancelled: false,
 	}
@@ -43,6 +99,26 @@ func (m SelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+
+		minVisibleItems := 10
+		maxVisibleItems := 20
+
+		footerHeight := 2
+		titleHeight := 3
+		statusBarHeight := 2
+		availableHeight := m.Height - footerHeight - titleHeight - statusBarHeight
+
+		// Each item is 1 line
+		visibleItems := availableHeight
+		if visibleItems < minVisibleItems {
+			visibleItems = minVisibleItems
+		}
+		if visibleItems > maxVisibleItems {
+			visibleItems = maxVisibleItems
+		}
+
+		m.list.SetWidth(60)
+		m.list.SetHeight(visibleItems + statusBarHeight)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -55,69 +131,38 @@ func (m SelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Cancelled = true
 			return m, nil
 
-		case "up", "k":
-			if m.Cursor > 0 {
-				m.Cursor--
-			}
-			return m, nil
-
-		case "down", "j":
-			if m.Cursor < len(m.Items)-1 {
-				m.Cursor++
-			}
-			return m, nil
-
-		case "enter", " ":
-			if len(m.Items) > 0 {
-				m.Selected = m.Items[m.Cursor].Value
+		case "enter":
+			// Get selected item
+			if i, ok := m.list.SelectedItem().(SelectionItem); ok {
+				m.Selected = i.Value
 			}
 			return m, nil
 		}
 	}
 
-	return m, nil
+	// Delegate to list
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
 }
 
 func (m SelectionModel) View() string {
-	var s string
+	listView := m.list.View()
 
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("226")).
-		Padding(1, 0)
+	footerStyle := lipgloss.NewStyle().Faint(true).Padding(1, 0)
+	footer := footerStyle.Render("↑/↓ to navigate • Enter to select • / to filter • Esc to cancel")
 
-	s += titleStyle.Render(m.Title) + "\n\n"
+	content := lipgloss.JoinVertical(lipgloss.Left, listView, footer)
 
-	// Render items
-	for i, item := range m.Items {
-		cursor := "  "
-		if m.Cursor == i {
-			cursor = "> "
-		}
-
-		itemStyle := lipgloss.NewStyle()
-		if m.Cursor == i {
-			itemStyle = itemStyle.Bold(true).Foreground(lipgloss.Color("226"))
-		} else {
-			itemStyle = itemStyle.Faint(true)
-		}
-
-		s += fmt.Sprintf("%s%s\n", cursor, itemStyle.Render(item.Label))
-	}
-
-	s += "\n"
-	footerStyle := lipgloss.NewStyle().Faint(true)
-	s += footerStyle.Render("↑/↓ pour naviguer • Entrée pour sélectionner • Esc pour annuler")
-
-	// Center content
-	boxWidth := lipgloss.Width(s)
-	boxHeight := lipgloss.Height(s)
+	// Center everything
+	boxWidth := lipgloss.Width(content)
+	boxHeight := lipgloss.Height(content)
 	horizontalMargin := max(0, (m.Width-boxWidth)/2)
 	verticalMargin := max(0, (m.Height-boxHeight)/2)
 
-	boxStyle := lipgloss.NewStyle().
+	centeredStyle := lipgloss.NewStyle().
 		MarginTop(verticalMargin).
 		MarginLeft(horizontalMargin)
 
-	return boxStyle.Render(s)
+	return centeredStyle.Render(content)
 }
