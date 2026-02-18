@@ -23,7 +23,18 @@ var asciiArt string = `
                                                             
 `
 
+type AppState int
+
+const (
+	StateForm AppState = iota
+	StateMangaSelection
+	StateScanSelection
+	StateDownloading
+)
+
 type Model struct {
+	State AppState
+
 	Title        string
 	MangaInput   textinput.Model
 	AllCheckbox  Checkbox
@@ -42,6 +53,13 @@ type Model struct {
 	pipeReader *io.PipeReader
 	pipeWriter *io.PipeWriter
 	scanner    *bufio.Scanner
+
+	SelectionModel SelectionModel
+
+	// Temporary data for multi-step workflow
+	SelectedMangaURL  string
+	SelectedScanPath  string
+	SelectedMangaName string
 }
 
 func getDefaultScanDir() string {
@@ -50,15 +68,15 @@ func getDefaultScanDir() string {
 		return ""
 	}
 
-	return filepath.Join(home, "Documents", "<nom_du_manga>")
+	return filepath.Join(home, "Documents")
 }
 
 func InitialModel() Model {
 	manga := textinput.New()
-	manga.Placeholder = "ex: jujutsu-kaisen"
+	manga.Placeholder = "ex: one piece"
 	manga.Focus()
 	manga.Prompt = "> "
-	manga.CharLimit = 50
+	manga.CharLimit = 100
 	manga.Width = 60
 
 	rangeInput := textinput.New()
@@ -78,6 +96,7 @@ func InitialModel() Model {
 	domain.Width = 60
 
 	return Model{
+		State:         StateForm,
 		Title:         asciiArt,
 		MangaInput:    manga,
 		AllCheckbox:   Checkbox{Label: "Télécharger tous les chapitres.", Checked: false},

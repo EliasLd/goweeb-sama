@@ -7,17 +7,19 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/EliasLd/scan-scraper/internal/logger"
 )
 
 // ExtractMangaName fetches the scan/v* page and extracts the real manga name
 // Returns the exact name (e.g., "One Piece Couleur")
-func ExtractMangaName(scanPageURL string, writer io.Writer) (string, error) {
+func ExtractMangaName(scanPageURL string, log *logger.Logger) (string, error) {
 	// Add trailing slash if missing (site requires it)
 	if !strings.HasSuffix(scanPageURL, "/") {
 		scanPageURL += "/"
 	}
 
-	fmt.Fprintf(writer, "[L] Extracting manga name from: %s\n", scanPageURL)
+	log.Debug("Extracting manga name from: %s\n", scanPageURL)
 
 	client := &http.Client{
 		Timeout: 15 * time.Second,
@@ -54,7 +56,7 @@ func ExtractMangaName(scanPageURL string, writer io.Writer) (string, error) {
 
 	if len(match) >= 2 {
 		mangaName := match[1]
-		fmt.Fprintf(writer, "[L] Extracted manga name from title: %s\n", mangaName)
+		log.Debug("Extracted manga name from title: %s\n", mangaName)
 		return mangaName, nil
 	}
 
@@ -64,7 +66,7 @@ func ExtractMangaName(scanPageURL string, writer io.Writer) (string, error) {
 
 	if len(match) >= 2 {
 		mangaName := strings.TrimSpace(match[1])
-		fmt.Fprintf(writer, "[L] Extracted manga name from comment: %s\n", mangaName)
+		log.Debug("Extracted manga name from comment: %s\n", mangaName)
 		return mangaName, nil
 	}
 
@@ -74,7 +76,7 @@ func ExtractMangaName(scanPageURL string, writer io.Writer) (string, error) {
 
 	if len(match) >= 2 {
 		mangaName := match[1]
-		fmt.Fprintf(writer, "[L] Extracted manga name from JS: %s\n", mangaName)
+		log.Debug("Extracted manga name from JS: %s\n", mangaName)
 		return mangaName, nil
 	}
 

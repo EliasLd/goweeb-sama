@@ -2,8 +2,9 @@ package fetch
 
 import (
 	"fmt"
-	"io"
 	"strings"
+
+	"github.com/EliasLd/scan-scraper/internal/logger"
 )
 
 const (
@@ -12,15 +13,15 @@ const (
 )
 
 // Returns the custom domain if provided, otherwise returns the default domain
-func GetActiveDomain(customDomain string, writer io.Writer) string {
+func GetActiveDomain(customDomain string, log *logger.Logger) string {
 	// If user specified a custom domain, use it directly
 	if customDomain != "" {
-		fmt.Fprintf(writer, "[L] Using custom domain: %s\n", customDomain)
+		log.Info("Using custom domain: %s\n", customDomain)
 		return customDomain
 	}
 
 	// Otherwise use default domain
-	fmt.Fprintf(writer, "[L] Using default domain: %s\n", DefaultDomain)
+	log.Info("Using default domain: %s\n", DefaultDomain)
 	return DefaultDomain
 }
 

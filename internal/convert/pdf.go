@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,6 +11,8 @@ import (
 
 	"github.com/signintech/gopdf"
 	"golang.org/x/image/webp"
+
+	"github.com/EliasLd/scan-scraper/internal/logger"
 )
 
 // Opens the file at path and checks
@@ -63,10 +64,10 @@ func WebPToJPG(srcPath, destPath string) error {
 	return nil
 }
 
-func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, writer io.Writer) error {
+func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, log *logger.Logger) error {
 	files, err := os.ReadDir(imagesDir)
 	if err != nil {
-		fmt.Fprintf(writer, "[E] Failed to read image dir: %v", err)
+		log.Error("Failed to read image dir: %v", err)
 		return fmt.Errorf("Failed to read image dir: %v", err)
 	}
 
@@ -104,7 +105,7 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, writer io.Writer
 			if isWebP {
 				err := WebPToJPG(imagePath, imagePath)
 				if err != nil {
-					fmt.Fprintf(writer, "Failed to convert WebP: %v\n", err)
+					log.Error("Failed to convert WebP: %v\n", err)
 					continue
 				}
 			}
@@ -137,11 +138,11 @@ func ImagesToPDF(imagesDir, outputPDFPath string, cleanup bool, writer io.Writer
 
 	// Save newly created PDF file
 	if err := pdf.WritePdf(outputPDFPath); err != nil {
-		fmt.Fprintf(writer, "[E] Failed to write PDF: %v", err)
+		log.Error("Failed to write PDF: %v", err)
 		return fmt.Errorf("Failed to write PDF: %w", err)
 	}
 
-	fmt.Fprintf(writer, "PDF generated at: %s\n", outputPDFPath)
+	log.Debug("PDF generated at: %s\n", outputPDFPath)
 
 	return nil
 }

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/EliasLd/scan-scraper/internal/logger"
 )
 
 type ScanPathResult struct {
@@ -20,8 +22,8 @@ type ScanPathResult struct {
 // Fetches the manga page, extracts all available scan paths
 // from panneauScan() function calls.
 // Returns the path(s) (e.g., "scan/vf", "scan/va", "Scans (couleur)", etc...")
-func GetAllScanPaths(mangaURL string, writer io.Writer) ([]ScanPathResult, error) {
-	fmt.Fprintf(writer, "[L] Fetching scan path from: %s\n", mangaURL)
+func GetAllScanPaths(mangaURL string, log *logger.Logger) ([]ScanPathResult, error) {
+	log.Debug("Fetching scan path from: %s\n", mangaURL)
 
 	client := &http.Client{
 		Timeout: 15 * time.Second,
@@ -81,34 +83,34 @@ func GetAllScanPaths(mangaURL string, writer io.Writer) ([]ScanPathResult, error
 		return nil, fmt.Errorf("no scan paths found")
 	}
 
-	fmt.Fprintf(writer, "[L] Found %d scan option(s)\n", len(results))
+	log.Info("Found %d scan option(s)\n", len(results))
 
 	return results, nil
 }
 
 // Displays scan options and asks user to choose
-func PromptUserToSelectScanPath(scanPaths []ScanPathResult, writer io.Writer) (string, error) {
+func PromptUserToSelectScanPath(scanPaths []ScanPathResult, log *logger.Logger) (string, error) {
 	if len(scanPaths) == 0 {
 		return "", fmt.Errorf("no scan paths to choose from")
 	}
 
 	if len(scanPaths) == 1 {
-		fmt.Fprintf(writer, "[L] Only one scan option: %s\n", scanPaths[0].Label)
-		fmt.Fprintf(writer, "[L] Auto-selecting: %s\n", scanPaths[0].Path)
+		log.Debug("Only one scan option: %s\n", scanPaths[0].Label)
+		log.Debug("Auto-selecting: %s\n", scanPaths[0].Path)
 		return scanPaths[0].Path, nil
 	}
 
 	// Display all options
-	fmt.Fprintln(writer, "\nMultiple scan versions found:")
+	log.Info("\nMultiple scan versions found:\n")
 	for i, sp := range scanPaths {
-		fmt.Fprintf(writer, " [%d] - %s\n", i+1, sp.Label)
+		log.Info(" [%d] - %s\n", i+1, sp.Label)
 	}
-	fmt.Fprintln(writer)
+	log.Info("")
 
 	// Prompt user
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Fprintf(writer, "Select a scan version (1-%d) or 0 to cancel: ", len(scanPaths))
+		log.Info("Select a scan version (1-%d) or 0 to cancel: ", len(scanPaths))
 
 		input, err := reader.ReadString('\n')
 		if err != nil {
@@ -119,23 +121,23 @@ func PromptUserToSelectScanPath(scanPaths []ScanPathResult, writer io.Writer) (s
 
 		choice, err := strconv.Atoi(input)
 		if err != nil {
-			fmt.Fprintln(writer, "Invalid input. Please enter a number")
+			log.Warn("Invalid input. Please enter a number")
 			continue
 		}
 
 		if choice == 0 {
-			fmt.Fprintln(writer, "[L] Selection cancelled by user")
+			log.Warn("Selection cancelled by user")
 			return "", nil
 		}
 
 		if choice < 1 || choice > len(scanPaths) {
-			fmt.Fprintf(writer, "Invalid choice. Please enter a number between 1 and %d.\n", len(scanPaths))
+			log.Warn("Invalid choice. Please enter a number between 1 and %d.\n", len(scanPaths))
 			continue
 		}
 
 		selected := scanPaths[choice-1]
-		fmt.Fprintf(writer, "[L] Selected: %s\n", selected.Label)
-		fmt.Fprintf(writer, "[L] Path: %s\n", selected.Path)
+		log.Debug("Selected: %s\n", selected.Label)
+		log.Debug("Path: %s\n", selected.Path)
 		return selected.Path, nil
 	}
 }

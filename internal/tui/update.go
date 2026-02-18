@@ -3,9 +3,13 @@ package tui
 import (
 	"bufio"
 	"fmt"
-	app "github.com/EliasLd/scan-scraper/internal/app"
 	"io"
 	"strings"
+
+	"github.com/EliasLd/scan-scraper/internal/app"
+	"github.com/EliasLd/scan-scraper/internal/fetch"
+	"github.com/EliasLd/scan-scraper/internal/logger"
+	"github.com/EliasLd/scan-scraper/internal/scraper"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -20,22 +24,92 @@ type setupLogPipeMsg struct {
 	reader *io.PipeReader
 }
 
+// Messages for async operations
+type catalogSearchResultMsg struct {
+	results []scraper.MangaResult
+	err     error
+}
+
+type scanPathResultMsg struct {
+	paths []scraper.ScanPathResult
+	err   error
+}
+
 func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
+	// Handle selection screen separately
+	if m.State == StateMangaSelection || m.State == StateScanSelection {
+		return handleSelectionUpdate(msg, m)
+	}
+
+	// Handle form and downloading states
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
 		return m, nil
-	case tea.KeyMsg:
 
-		if m.IsDownloading && msg.String() != "ctrl+c" {
+	case catalogSearchResultMsg:
+		if msg.err != nil {
+			m.Logs = append(m.Logs, errorStyle.Render(fmt.Sprintf("[E] Catalog search failed: %v", msg.err)))
+			return m, nil
+		}
+
+		if len(msg.results) == 0 {
+			m.Logs = append(m.Logs, errorStyle.Render("[E] No manga found"))
+			return m, nil
+		}
+
+		// If only one result, auto-select
+		if len(msg.results) == 1 {
+			m.SelectedMangaURL = msg.results[0].URL
+			return m, fetchScanPaths(m.SelectedMangaURL)
+		}
+
+		// Multiple results, show selection screen
+		items := make([]SelectionItem, len(msg.results))
+		for i, r := range msg.results {
+			items[i] = SelectionItem{Label: r.Title, Value: r.URL}
+		}
+
+		m.SelectionModel = NewSelectionModel("Sélectionnez un manga", items)
+		m.SelectionModel.Width = m.Width
+		m.SelectionModel.Height = m.Height
+		m.State = StateMangaSelection
+		return m, nil
+
+	case scanPathResultMsg:
+		if msg.err != nil {
+			m.Logs = append(m.Logs, errorStyle.Render(fmt.Sprintf("[E] Failed to get scan paths: %v", msg.err)))
+			return m, nil
+		}
+
+		// If only one scan path, auto-select
+		if len(msg.paths) == 1 {
+			m.SelectedScanPath = msg.paths[0].Path
+			return m, startDownload(m)
+		}
+
+		// Multiple scan paths, show selection screen
+		items := make([]SelectionItem, len(msg.paths))
+		for i, p := range msg.paths {
+			items[i] = SelectionItem{Label: p.Label, Value: p.Path}
+		}
+
+		m.SelectionModel = NewSelectionModel("Sélectionnez une version", items)
+		m.SelectionModel.Width = m.Width
+		m.SelectionModel.Height = m.Height
+		m.State = StateScanSelection
+		return m, nil
+
+	case tea.KeyMsg:
+		if m.IsDownloading && msg.String() != "ctrl+c" && msg.String() != "esc" {
 			return m, nil
 		}
 
 		switch msg.String() {
 
-		case "ctrl+c":
+		case "ctrl+c", "esc":
 			return m, tea.Quit
 
 		case "up":
@@ -52,7 +126,23 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			m = updateFocus(m)
 			return m, nil
 
-		case "enter", " ":
+		case " ":
+			// Allow space only in manga Input
+			if m.Cursor == 0 {
+				var cmd tea.Cmd
+				m.MangaInput, cmd = m.MangaInput.Update(msg)
+				return m, cmd
+			}
+
+			switch m.Cursor {
+			case 1:
+				m.AllCheckbox.Toggle()
+			case 5:
+				m.KeepCheckbox.Toggle()
+			}
+			return m, nil
+
+		case "enter":
 			switch m.Cursor {
 			case 1: // AllCheckbox
 				m.AllCheckbox.Toggle()
@@ -60,51 +150,21 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 				m.KeepCheckbox.Toggle()
 			case 6: // Download button
 				if m.DownloadReady {
-					opts := app.Options{
-						Slug:         m.MangaInput.Value(),
-						All:          m.AllCheckbox.Checked,
-						ScanDir:      m.ScanDirInput.Value(),
-						Cleanup:      !m.KeepCheckbox.Checked,
-						CustomDomain: strings.TrimSpace(m.DomainInput.Value()),
-					}
-
-					if !opts.All {
-						r := strings.TrimSpace(m.RangeInput.Value())
-
-						// Support:
-						// - "10-20"
-						// - "10-" (open ended)
-						var from, to int
-						if strings.HasSuffix(r, "-") {
-							trim := strings.TrimSuffix(r, "-")
-							_, err := fmt.Sscanf(trim, "%d", &from)
-							if err == nil {
-								opts.Range = [2]int{from, 0}
-							}
-						} else {
-							_, err := fmt.Sscanf(r, "%d-%d", &from, &to)
-							if err == nil {
-								opts.Range = [2]int{from, to}
-							}
-						}
-					}
-
-					m.IsDownloading = true
-					m.Logs = nil
-					return m, runDownloadInBackground(opts)
+					// Start catalog search
+					m.Logs = append(m.Logs, fmt.Sprintf("Searching for: %s", m.MangaInput.Value()))
+					return m, searchCatalog(m.MangaInput.Value(), m.DomainInput.Value())
 				}
 			}
 			return m, nil
 		}
 
-		// input handling
+		// Input handling
 		switch m.Cursor {
 		case 0:
 			var cmd tea.Cmd
 			m.MangaInput, cmd = m.MangaInput.Update(msg)
 			return m, cmd
 		case 2:
-			// Range only active if not "all" checked
 			if !m.AllCheckbox.Checked {
 				var cmd tea.Cmd
 				m.RangeInput, cmd = m.RangeInput.Update(msg)
@@ -114,7 +174,6 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.ScanDirInput, cmd = m.ScanDirInput.Update(msg)
 			return m, cmd
-
 		case 4:
 			var cmd tea.Cmd
 			m.DomainInput, cmd = m.DomainInput.Update(msg)
@@ -129,13 +188,20 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			styled := highlightStyle.Render(string(msg))
 			m.Logs = append(m.Logs, styled)
 			m.IsDownloading = false
-		case strings.HasPrefix(logLine, "[L]"):
-			m.Logs = append(m.Logs, logLine)
-		case strings.HasPrefix(logLine, "[E]"):
+		case strings.HasPrefix(logLine, "[DEBUG]"):
+			// Skip debug logs in TUI
+		case strings.Contains(logLine, "[ERROR]"):
 			styled := errorStyle.Render(logLine)
 			m.Logs = append(m.Logs, styled)
+		case strings.Contains(logLine, "[!]"):
+			// Warning logs
+			m.Logs = append(m.Logs, logLine)
+		default:
+			// Info level logs
+			m.Logs = append(m.Logs, logLine)
 		}
 		return m, readOneLogLine(m)
+
 	case setupLogPipeMsg:
 		m.pipeReader = msg.reader
 		m.scanner = bufio.NewScanner(m.pipeReader)
@@ -149,13 +215,42 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// Updates focus/blur of textinput field depending on the cursor
+func handleSelectionUpdate(msg tea.Msg, m Model) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	selectionModel, cmd := m.SelectionModel.Update(msg)
+	m.SelectionModel = selectionModel.(SelectionModel)
+
+	// Check if selection was made
+	if m.SelectionModel.Selected != "" {
+		if m.State == StateMangaSelection {
+			m.SelectedMangaURL = m.SelectionModel.Selected
+			m.State = StateForm
+			m.Logs = append(m.Logs, "Manga selected, fetching scan versions...")
+			return m, fetchScanPaths(m.SelectedMangaURL)
+		} else if m.State == StateScanSelection {
+			m.SelectedScanPath = m.SelectionModel.Selected
+			m.State = StateForm
+			m.Logs = append(m.Logs, "Scan version selected, starting download...")
+			return m, startDownload(m)
+		}
+	}
+
+	// Check if cancelled
+	if m.SelectionModel.Cancelled {
+		m.State = StateForm
+		m.Logs = append(m.Logs, "Selection cancelled")
+		return m, nil
+	}
+
+	return m, cmd
+}
+
 func updateFocus(m Model) Model {
 	m.MangaInput.Blur()
 	m.RangeInput.Blur()
 	m.ScanDirInput.Blur()
+	m.DomainInput.Blur()
 
-	// Apply focus on the selected field
 	switch m.Cursor {
 	case 0:
 		m.MangaInput.Focus()
@@ -171,12 +266,62 @@ func updateFocus(m Model) Model {
 	return m
 }
 
-func runDownloadInBackground(opts app.Options) tea.Cmd {
+// Async commands
+
+func searchCatalog(query, customDomain string) tea.Cmd {
 	return func() tea.Msg {
+		log := logger.New(io.Discard, logger.LevelInfo)
+		domain := fetch.GetActiveDomain(customDomain, log)
+		results, err := scraper.SearchCatalog(domain, query, log)
+		return catalogSearchResultMsg{results: results, err: err}
+	}
+}
+
+func fetchScanPaths(mangaURL string) tea.Cmd {
+	return func() tea.Msg {
+		log := logger.New(io.Discard, logger.LevelInfo)
+		paths, err := scraper.GetAllScanPaths(mangaURL, log)
+		return scanPathResultMsg{paths: paths, err: err}
+	}
+}
+
+func startDownload(m Model) tea.Cmd {
+	return func() tea.Msg {
+		// Build download options
+		opts := app.Options{
+			Slug:         m.MangaInput.Value(),
+			All:          m.AllCheckbox.Checked,
+			ScanDir:      m.ScanDirInput.Value(),
+			Cleanup:      !m.KeepCheckbox.Checked,
+			CustomDomain: strings.TrimSpace(m.DomainInput.Value()),
+		}
+
+		// Add selected data
+		opts.MangaURL = m.SelectedMangaURL
+		opts.ScanPath = m.SelectedScanPath
+
+		if !opts.All {
+			r := strings.TrimSpace(m.RangeInput.Value())
+			var from, to int
+			if strings.HasSuffix(r, "-") {
+				trim := strings.TrimSuffix(r, "-")
+				_, err := fmt.Sscanf(trim, "%d", &from)
+				if err == nil {
+					opts.Range = [2]int{from, 0}
+				}
+			} else {
+				_, err := fmt.Sscanf(r, "%d-%d", &from, &to)
+				if err == nil {
+					opts.Range = [2]int{from, to}
+				}
+			}
+		}
+
 		pr, pw := io.Pipe()
 
 		go func() {
-			app.Run(opts, pw)
+			log := logger.New(pw, logger.LevelInfo)
+			app.RunWithWorkflow(opts, log) // New function that skips catalog search
 			pw.Close()
 		}()
 

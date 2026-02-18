@@ -28,4 +28,3 @@ func (c Checkbox) View(focused bool) string {
 
 	return fmt.Sprintf("%s%s %s", cursor, checked, c.Label)
 }
-
