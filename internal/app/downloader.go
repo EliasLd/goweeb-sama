@@ -12,7 +12,7 @@ import (
 )
 
 func Run(opts Options, log *logger.Logger) {
-	if !opts.All && opts.Range == [2]int{} {
+	if !opts.All && opts.RangeMode == 0 {
 		log.Warn("Please use --all or --range to download chapters.")
 		return
 	}
@@ -78,10 +78,14 @@ func Run(opts Options, log *logger.Logger) {
 	// Filter chapters based on user's range
 	chapters := scanInfo.Chapters
 
-	if opts.Range != [2]int{} {
+	if opts.RangeMode == RangeLastN {
+		n := min(opts.Range[1], len(chapters))
+		chapters = chapters[len(chapters)-n:]
+		log.Info("Filtered to the last %d chapters\n", n)
+	} else if opts.Range != [2]int{} {
 		var filtered []int
 		for _, ch := range chapters {
-			if opts.Range[1] == 0 {
+			if opts.RangeMode == RangeOpenEnded && opts.Range[1] == 0 {
 				// Open-ended range (e.g., 10-)
 				if ch >= opts.Range[0] {
 					filtered = append(filtered, ch)
@@ -94,8 +98,7 @@ func Run(opts Options, log *logger.Logger) {
 			}
 		}
 		chapters = filtered
-
-		if opts.Range[1] == 0 {
+		if opts.RangeMode == RangeOpenEnded {
 			log.Info("Filtered to %d chapters from %d onwards\n", len(chapters), opts.Range[0])
 		} else {
 			log.Info("Filtered to %d chapters (%d-%d)\n", len(chapters), opts.Range[0], opts.Range[1])
@@ -160,8 +163,8 @@ func Run(opts Options, log *logger.Logger) {
 
 // Runs the download with pre-selected manga URL and scan path (used by TUI)
 func RunWithWorkflow(opts Options, log *logger.Logger) {
-	if !opts.All && opts.Range == [2]int{} {
-		log.Warn("Please use --all or --range to download chapters.")
+	if !opts.All && opts.RangeMode == 0 {
+		log.Warn("Please enter a valid range to download chapters.")
 		return
 	}
 
@@ -185,22 +188,27 @@ func RunWithWorkflow(opts Options, log *logger.Logger) {
 	// Filter chapters based on user's range
 	chapters := scanInfo.Chapters
 
-	if opts.Range != [2]int{} {
+	if opts.RangeMode == RangeLastN {
+		n := min(opts.Range[1], len(chapters))
+		chapters = chapters[len(chapters)-n:]
+		log.Info("Filtered to the last %d chapters\n", n)
+	} else if opts.Range != [2]int{} {
 		var filtered []int
 		for _, ch := range chapters {
-			if opts.Range[1] == 0 {
+			if opts.RangeMode == RangeOpenEnded && opts.Range[1] == 0 {
+				// Open-ended range (e.g., 10-)
 				if ch >= opts.Range[0] {
 					filtered = append(filtered, ch)
 				}
 			} else {
+				// Closed range (e.g., 1-5)
 				if ch >= opts.Range[0] && ch <= opts.Range[1] {
 					filtered = append(filtered, ch)
 				}
 			}
 		}
 		chapters = filtered
-
-		if opts.Range[1] == 0 {
+		if opts.RangeMode == RangeOpenEnded {
 			log.Info("Filtered to %d chapters from %d onwards\n", len(chapters), opts.Range[0])
 		} else {
 			log.Info("Filtered to %d chapters (%d-%d)\n", len(chapters), opts.Range[0], opts.Range[1])

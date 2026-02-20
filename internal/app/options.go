@@ -11,7 +11,8 @@ import (
 type RangeMode int
 
 const (
-	RangeNormal RangeMode = iota
+	RangeNone = iota
+	RangeNormal
 	RangeOpenEnded
 	RangeLastN
 )
@@ -85,7 +86,7 @@ func ParseFlags() Options {
 	}
 
 	var chapterRange [2]int
-	var rangeMode RangeMode = RangeNormal
+	var rangeMode RangeMode = RangeNone
 
 	if rangeStr != "" {
 		// Handle last N chapters
