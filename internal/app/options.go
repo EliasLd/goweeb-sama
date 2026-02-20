@@ -85,9 +85,22 @@ func ParseFlags() Options {
 	}
 
 	var chapterRange [2]int
+	var rangeMode RangeMode = RangeNormal
+
 	if rangeStr != "" {
-		// Handle open-ended range like "10-"
-		if strings.HasSuffix(rangeStr, "-") {
+		// Handle last N chapters
+		if strings.HasPrefix(rangeStr, "-") && len(rangeStr) > 1 {
+			var nLast int
+			n, err := fmt.Sscanf(rangeStr, "-%d", &nLast)
+			if err != nil || n != 1 || nLast <= 0 {
+				fmt.Printf("Invalid range format: %s. Use format <start-end>, <start>- or -<N>\n", rangeStr)
+				os.Exit(1)
+			}
+			chapterRange[0] = 0 // useles for LastN format, filled for compatiblity
+			chapterRange[1] = nLast
+			rangeMode = RangeLastN
+			// Handle open-ended range like "10-"
+		} else if strings.HasSuffix(rangeStr, "-") {
 			var start int
 			trimmed := strings.TrimSuffix(rangeStr, "-")
 			n, err := fmt.Sscanf(trimmed, "%d", &start)
@@ -97,16 +110,28 @@ func ParseFlags() Options {
 			}
 			chapterRange[0] = start
 			chapterRange[1] = 0 // 0 means open-ended
-		} else {
+			rangeMode = RangeOpenEnded
 			// Normal range like "10-20"
+		} else {
 			var start, end int
 			n, err := fmt.Sscanf(rangeStr, "%d-%d", &start, &end)
-			if err != nil || n != 2 || start > end {
-				fmt.Printf("Invalid range format: %s. Use format: <start>-<end> or <start>-\n", rangeStr)
-				os.Exit(1)
+			if err == nil && n == 2 && start <= end {
+				chapterRange[0] = start
+				chapterRange[1] = end
+				rangeMode = RangeNormal
+			} else {
+				// If only one chapter provided
+				var solo int
+				n, err := fmt.Sscanf(rangeStr, "%d", &solo)
+				if err == nil && n == 1 {
+					chapterRange[0] = solo
+					chapterRange[1] = solo
+					rangeMode = RangeNormal
+				} else {
+					fmt.Printf("Invalid range format: %s. Use format: <start>-<end>, <start>-, -<N> or <chapter>\n", rangeStr)
+					os.Exit(1)
+				}
 			}
-			chapterRange[0] = start
-			chapterRange[1] = end
 		}
 	}
 
@@ -124,6 +149,7 @@ func ParseFlags() Options {
 		All:          all,
 		Range:        chapterRange,
 		ScanDir:      dir,
+		RangeMode:    rangeMode,
 		Cleanup:      !keepImages,
 		CustomDomain: domain,
 		Debug:        debug,
