@@ -294,34 +294,64 @@ func startDownload(m Model) tea.Cmd {
 			ScanDir:      m.ScanDirInput.Value(),
 			Cleanup:      !m.KeepCheckbox.Checked,
 			CustomDomain: strings.TrimSpace(m.DomainInput.Value()),
+			MangaURL:     m.SelectedMangaURL,
+			ScanPath:     m.SelectedScanPath,
 		}
 
-		// Add selected data
-		opts.MangaURL = m.SelectedMangaURL
-		opts.ScanPath = m.SelectedScanPath
-
 		if !opts.All {
+			// Range parsing
 			r := strings.TrimSpace(m.RangeInput.Value())
-			var from, to int
-			if strings.HasSuffix(r, "-") {
-				trim := strings.TrimSuffix(r, "-")
-				_, err := fmt.Sscanf(trim, "%d", &from)
-				if err == nil {
-					opts.Range = [2]int{from, 0}
+			var rangeMode app.RangeMode = app.RangeNone
+			var chapterRange [2]int
+
+			switch {
+			case strings.HasPrefix(r, "-") && len(r) > 1:
+				// N last chapters
+				var nLast int
+				n, err := fmt.Sscanf(r, "-%d", &nLast)
+				if err == nil && n == 1 && nLast > 0 {
+					chapterRange[1] = nLast
+					rangeMode = app.RangeLastN
 				}
-			} else {
-				_, err := fmt.Sscanf(r, "%d-%d", &from, &to)
-				if err == nil {
-					opts.Range = [2]int{from, to}
+			case strings.HasSuffix(r, "-"):
+				// From chapter N to last
+				var start int
+				trim := strings.TrimSuffix(r, "-")
+				n, err := fmt.Sscanf(trim, "%d", &start)
+				if err == nil && n == 1 {
+					chapterRange[0] = start
+					chapterRange[1] = 0
+					rangeMode = app.RangeOpenEnded
+				}
+			default:
+				// N-M, from chapter N to chapter M, normal case
+				var start, end int
+				n, err := fmt.Sscanf(r, "%d-%d", &start, &end)
+				if err == nil && n == 2 && start <= end {
+					chapterRange[0] = start
+					chapterRange[1] = end
+					rangeMode = app.RangeNormal
+				} else {
+					// chapter N alone
+					var solo int
+					n, err := fmt.Sscanf(r, "%d", &solo)
+					if err == nil && n == 1 {
+						chapterRange[0] = solo
+						chapterRange[1] = solo
+						rangeMode = app.RangeNormal
+					}
 				}
 			}
+
+			opts.Range = chapterRange
+			opts.RangeMode = rangeMode
 		}
 
 		pr, pw := io.Pipe()
 
 		go func() {
 			log := logger.New(pw, logger.LevelInfo)
-			app.RunWithWorkflow(opts, log) // New function that skips catalog search
+			app.RunWithWorkflow(opts, log)
 			pw.Close()
 		}()
 
