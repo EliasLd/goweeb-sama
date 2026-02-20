@@ -8,11 +8,20 @@ import (
 	"strings"
 )
 
+type RangeMode int
+
+const (
+	RangeNormal RangeMode = iota
+	RangeOpenEnded
+	RangeLastN
+)
+
 // Holds parsed CLI arguments
 type Options struct {
 	Slug         string
 	All          bool
 	Range        [2]int // [0] = start, [1] = end (0 means open-ended)
+	RangeMode    RangeMode
 	ScanDir      string
 	Cleanup      bool
 	CustomDomain string // custom domain override
