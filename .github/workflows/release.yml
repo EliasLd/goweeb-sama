@@ -49,7 +49,7 @@ jobs:
             if [ "${os}" = "windows" ]; then
               zip "dist/goweeb-${VERSION}-${os}-${arch}.zip" "${bin}"
             else
-              tar -czvf "dist/goweeb-${VERSION}-${os}-${arch}.tar.gz" "${bin}"
+              tar -czvf "dist/goweeb-${VERSION}-${archive_os}-${arch}.tar.gz" "${bin}"
             fi
 
             rm "${bin}"
@@ -71,7 +71,7 @@ jobs:
             if [ "${os}" = "windows" ]; then
               zip "dist/goweeb-tui-${VERSION}-${os}-${arch}.zip" "${bin}"
             else
-              tar -czvf "dist/goweeb-tui-${VERSION}-${os}-${arch}.tar.gz" "${bin}"
+              tar -czvf "dist/goweeb-tui-${VERSION}-${archive_os}-${arch}.tar.gz" "${bin}"
             fi
 
             rm "${bin}"
