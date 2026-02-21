@@ -38,6 +38,11 @@ jobs:
             local arch="$2"
             local ext="$3"
 
+            local archive_os="$os"
+            if [ "$os" = "darwin" ]; then
+              archive_os="macos"
+            fi
+
             local bin="goweeb${ext}"
             GOOS="${os}" GOARCH="${arch}" go build -ldflags="-s -w" -o "${bin}" ./cmd/goweeb-cli
 
@@ -55,7 +60,12 @@ jobs:
             local arch="$2"
             local ext="$3"
 
-            local bin="goweeb-tui${ext}"
+            local archive_os="$os"
+            if [ "$os" = "darwin" ]; then
+              archive_os="macos"
+            fi
+
+            local bin="goweeb${ext}"
             GOOS="${os}" GOARCH="${arch}" go build -ldflags="-s -w" -o "${bin}" ./cmd/goweeb-tui
 
             if [ "${os}" = "windows" ]; then

@@ -33,7 +33,7 @@ func viewForm(m Model) string {
 	form.WriteString(titleStyle.Render(m.Title))
 	form.WriteString("\n\n")
 
-	form.WriteString(labelStyle.Render("Nom du manga (espaces autorisés)"))
+	form.WriteString(labelStyle.Render("Nom du manga"))
 	form.WriteString("\n\n")
 	if m.Cursor == 0 {
 		form.WriteString(m.MangaInput.View())

@@ -72,7 +72,7 @@ goweeb [options] "nom-du-manga"
 | Option | Raccourci | Description |
 |--------|-----------|-------------|
 | `--all` | `-a` | Télécharge tous les chapitres disponibles |
-| `--range <plage>` | `-r` | Spécifie une plage de chapitres (ex: `10-77`, `14-`) |
+| `--range <plage>` | `-r` | Spécifie une plage de chapitres (ex: `10-77`, `4` chapitre 4 uniquement, `14-` du chapitre 14 jusqu'à la fin, `-5` pour les 5 derniers chapitres par exemple) |
 | `--scan-dir <dossier>` | `-d` | Dossier où sauvegarder les PDF (par défaut : `pdf`) |
 | `--keep-images` | `-k` | Garde les images après la création du PDF |
 | `--domain <url>` | `-u` | Remplace le domaine anime-sama (ex: `https://anime-sama.tv`) |
@@ -96,6 +96,9 @@ goweeb -r 10-50 "one piece"
 
 # Du chapitre 14 jusqu'au dernier disponible
 goweeb -r 14- "chainsaw man"
+
+# Les 3 derniers chapitres
+goweeb -r -3 "ao ashi"
 ```
 
 #### Spécifier un dossier de destination
@@ -103,8 +106,11 @@ goweeb -r 14- "chainsaw man"
 # Les PDF seront sauvegardés dans le dossier "mes-mangas"
 goweeb -d mes-mangas --all "naruto"
 
-# Ou avec le chemin complet
+# Ou avec le chemin complet (sous linux)
 goweeb --scan-dir ~/Documents/Mangas -r 1-100 "one piece"
+
+# Pareil mais sur Windows
+goweeb --scan-dir C:\Users\<nom-de-ton-utilisateur>\Documents\Mangas -r 1-100 "one piece"
 ```
 
 #### Spécifier un domaine personnalisé
