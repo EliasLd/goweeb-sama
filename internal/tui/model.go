@@ -80,9 +80,9 @@ func InitialModel() Model {
 	manga.Width = 60
 
 	rangeInput := textinput.New()
-	rangeInput.Placeholder = "ex: 1-28"
+	rangeInput.Placeholder = "ex: 7, 1-30, 30- (30 jusqu'à la fin), -5 (5 derniers)"
 	rangeInput.Prompt = "> "
-	rangeInput.Width = 60
+	rangeInput.Width = 85
 
 	scanDir := textinput.New()
 	scanDir.Placeholder = "ex: C:\\Users\\<username>\\Documents\\scans\\jjk"
