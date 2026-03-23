@@ -9,7 +9,7 @@ import (
 
 const (
 	// Default domain to use
-	DefaultDomain = "https://anime-sama.tv"
+	DefaultDomain = "https://anime-sama.to"
 )
 
 // Returns the custom domain if provided, otherwise returns the default domain
