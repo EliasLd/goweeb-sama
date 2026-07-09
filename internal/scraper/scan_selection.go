@@ -6,12 +6,13 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/EliasLd/scan-scraper/internal/logger"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 type ScanPathResult struct {
@@ -53,31 +54,31 @@ func GetAllScanPaths(mangaURL string, log *logger.Logger) ([]ScanPathResult, err
 
 	html := string(body)
 
-	// Extract scan paths from panneauScan() call
-	// Pattern: panneauScan("Scans", "scan/vf");
-	// Or: panneauScan("Scans (VF)", "scan/vf");
-	// Or: panneauScan("Scans (VA)", "scan/va");
-	// Or: panneauScan("Scans (couleur)", "scan/vf");
-
-	panneauRegex := regexp.MustCompile(`panneauScan\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)`)
-	allMatches := panneauRegex.FindAllStringSubmatch(html, -1)
-
-	if len(allMatches) == 0 {
-		return nil, fmt.Errorf("no scan paths found in manga page")
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse manga page: %w", err)
 	}
 
 	var results []ScanPathResult
-	for _, match := range allMatches {
-		if len(match) >= 3 {
-			// Only include scan-related paths (skip anime episodes)
-			if strings.Contains(strings.ToLower(match[1]), "scan") {
-				results = append(results, ScanPathResult{
-					Label: match[1],
-					Path:  match[2],
-				})
-			}
+
+	doc.Find(`a[href*="/scan/"]`).Each(func(i int, link *goquery.Selection) {
+
+		href, ok := link.Attr("href")
+		if !ok {
+			return
 		}
-	}
+
+		label := strings.TrimSpace(link.Text())
+
+		if label == "" {
+			label = href
+		}
+
+		results = append(results, ScanPathResult{
+			Label: label,
+			Path:  href,
+		})
+	})
 
 	if len(results) == 0 {
 		return nil, fmt.Errorf("no scan paths found")
