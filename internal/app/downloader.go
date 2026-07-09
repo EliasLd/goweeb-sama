@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -61,7 +62,26 @@ func Run(opts Options, log *logger.Logger) {
 		return
 	}
 
-	scanPageURL := scraper.CleanURL(mangaURL, scanPath)
+	log.Debug("activeDomain = %q\n", activeDomain)
+	log.Debug("scanPath     = %q\n", scanPath)
+
+	siteURL, err := url.Parse(activeDomain)
+	if err != nil {
+		log.Error("Invalid domain: %v\n", err)
+		return
+	}
+
+	scanRef, err := url.Parse(scanPath)
+	if err != nil {
+		log.Error("Invalid scan path: %v\n", err)
+		return
+	}
+
+	log.Debug("scanRef = %#v\n", scanRef)
+
+	scanPageURL := siteURL.ResolveReference(scanRef).String()
+
+	log.Debug("scanPageURL = %s\n", scanPageURL)
 
 	mangaName, err := scraper.ExtractMangaName(scanPageURL, log)
 	if err != nil {
@@ -171,7 +191,19 @@ func RunWithWorkflow(opts Options, log *logger.Logger) {
 	activeDomain := fetch.GetActiveDomain(opts.CustomDomain, log)
 
 	// Use pre-selected manga URL and scan path (no prompts)
-	scanPageURL := scraper.CleanURL(opts.MangaURL, opts.ScanPath)
+	siteURL, err := url.Parse(activeDomain)
+	if err != nil {
+		log.Error("Invalid domain: %v\n", err)
+		return
+	}
+
+	scanRef, err := url.Parse(opts.ScanPath)
+	if err != nil {
+		log.Error("Invalid scan path: %v\n", err)
+		return
+	}
+
+	scanPageURL := siteURL.ResolveReference(scanRef).String()
 
 	mangaName, err := scraper.ExtractMangaName(scanPageURL, log)
 	if err != nil {
