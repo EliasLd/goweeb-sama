@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/EliasLd/scan-scraper/internal/logger"
+	"github.com/PuerkitoBio/goquery"
 )
 
 type MangaResult struct {
@@ -59,28 +59,41 @@ func SearchCatalog(domain, query string, log *logger.Logger) ([]MangaResult, err
 
 	html := string(body)
 
-	// Extract the first manga card link
-	// Pattern: <a href="https://anime-sama.tv/catalogue/one-piece/">
-	// We look for: <div class="shrink-0 catalog-card card-base"> followed by <a href="...">
-	cardRegex := regexp.MustCompile(`(?s)<div class="shrink-0 catalog-card card-base">.*?<a href="([^"]+)".*?<h2 class="card-title">([^<]+)</h2>`)
-	matches := cardRegex.FindAllStringSubmatch(html, -1)
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse catalog page: %w", err)
+	}
 
-	if len(matches) == 0 {
+	var results []MangaResult
+
+	doc.Find("div.catalog-card").Each(func(i int, card *goquery.Selection) {
+		link := card.Find("a").First()
+
+		href, exists := link.Attr("href")
+		if !exists {
+			return
+		}
+
+		title := strings.TrimSpace(
+			card.Find(".card-title").Text(),
+		)
+
+		if strings.HasPrefix(href, "/") {
+			href = strings.TrimSuffix(domain, "/") + href
+		}
+
+		results = append(results, MangaResult{
+			Title: title,
+			URL:   href,
+		})
+	})
+
+	if len(results) == 0 {
 		log.Warn("No manga found in catalog")
 		return nil, nil
 	}
 
-	var results []MangaResult
-	for _, match := range matches {
-		if len(match) >= 3 {
-			results = append(results, MangaResult{
-				Title: strings.TrimSpace(match[2]),
-				URL:   match[1],
-			})
-		}
-	}
-
-	log.Info("Found %d results(s)\n", len(results))
+	log.Info("Found %d result(s)\n", len(results))
 
 	return results, nil
 }
