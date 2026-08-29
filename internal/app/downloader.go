@@ -229,11 +229,14 @@ func RunWithWorkflow(opts Options, log *logger.Logger) {
 
 	activeDomain := fetch.GetActiveDomain(opts.CustomDomain, log)
 
-	// Use pre-selected manga URL and scan path (no prompts)
-	siteURL, err := url.Parse(activeDomain)
+	// Resolve scan URL from selected manga URL (important for relative "scan/vf")
+	mangaBase, err := url.Parse(opts.MangaURL)
 	if err != nil {
-		log.Error("Invalid domain: %v\n", err)
+		log.Error("Invalid manga URL: %v\n", err)
 		return
+	}
+	if !strings.HasSuffix(mangaBase.Path, "/") {
+		mangaBase.Path += "/"
 	}
 
 	scanRef, err := url.Parse(opts.ScanPath)
@@ -242,7 +245,7 @@ func RunWithWorkflow(opts Options, log *logger.Logger) {
 		return
 	}
 
-	scanPageURL := siteURL.ResolveReference(scanRef).String()
+	scanPageURL := mangaBase.ResolveReference(scanRef).String()
 
 	mangaName, err := scraper.ExtractMangaName(scanPageURL, log)
 	if err != nil {
@@ -256,7 +259,6 @@ func RunWithWorkflow(opts Options, log *logger.Logger) {
 		return
 	}
 
-	// Filter chapters based on user's range
 	chapters := scanInfo.Chapters
 
 	if opts.RangeMode == RangeLastN {
@@ -267,12 +269,10 @@ func RunWithWorkflow(opts Options, log *logger.Logger) {
 		var filtered []int
 		for _, ch := range chapters {
 			if opts.RangeMode == RangeOpenEnded && opts.Range[1] == 0 {
-				// Open-ended range (e.g., 10-)
 				if ch >= opts.Range[0] {
 					filtered = append(filtered, ch)
 				}
 			} else {
-				// Closed range (e.g., 1-5)
 				if ch >= opts.Range[0] && ch <= opts.Range[1] {
 					filtered = append(filtered, ch)
 				}
@@ -301,10 +301,38 @@ func RunWithWorkflow(opts Options, log *logger.Logger) {
 
 	baseURL := fmt.Sprintf("%s/s2/scans/%s", activeDomain, scanInfo.MangaName)
 
+	maxChapter := chapters[len(chapters)-1]
+	digits := len(fmt.Sprintf("%d", maxChapter))
+	if digits < 3 {
+		digits = 3
+	}
+
+	if opts.EbookFriendly {
+		if err := os.MkdirAll(opts.ScanDir, os.ModePerm); err != nil {
+			log.Error("Failed to create output dir: %v\n", err)
+			return
+		}
+	}
+
 	for _, chNum := range chapters {
 		chStr := fmt.Sprintf("%d", chNum)
 		log.Info("Downloading chapter %s...\n", chStr)
 
+		if opts.EbookFriendly {
+			chapterFolder := fmt.Sprintf("Chapter %0*d", digits, chNum)
+			chapterDir := filepath.Join(opts.ScanDir, chapterFolder)
+
+			err = fetch.DownloadChapterFromBaseURL(baseURL, chStr, chapterDir, log)
+			if err != nil {
+				log.Error("Failed to download chapter %s: %v\n", chStr, err)
+				continue
+			}
+
+			log.Info("Chapter %s saved to %s\n", chStr, chapterDir)
+			continue
+		}
+
+		// PDF mode
 		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chStr)
 
 		err = fetch.DownloadChapterFromBaseURL(baseURL, chStr, imageDir, log)
@@ -329,7 +357,7 @@ func RunWithWorkflow(opts Options, log *logger.Logger) {
 		log.Info("Chapter %s saved as %s\n", chStr, pdfPath)
 	}
 
-	if opts.Cleanup {
+	if opts.Cleanup && !opts.EbookFriendly {
 		rootImagesDir := filepath.Join(homeDir, "Images", opts.Slug)
 		log.Debug("Cleaning up: %s\n", rootImagesDir)
 		os.RemoveAll(rootImagesDir)
