@@ -19,14 +19,15 @@ const (
 
 // Holds parsed CLI arguments
 type Options struct {
-	Slug         string
-	All          bool
-	Range        [2]int // [0] = start, [1] = end (0 means open-ended)
-	RangeMode    RangeMode
-	ScanDir      string
-	Cleanup      bool
-	CustomDomain string // custom domain override
-	Debug        bool
+	Slug          string
+	All           bool
+	Range         [2]int // [0] = start, [1] = end (0 means open-ended)
+	RangeMode     RangeMode
+	ScanDir       string
+	Cleanup       bool
+	CustomDomain  string // custom domain override
+	Debug         bool
+	EbookFriendly bool
 
 	MangaURL string
 	ScanPath string
@@ -43,6 +44,8 @@ func ParseFlags() Options {
 	var scanDir string
 	flag.StringVar(&scanDir, "scan-dir", "pdf", "Directory to save the generated PDF files")
 	flag.StringVar(&scanDir, "d", "pdf", "Shorthand for --scan-dir")
+
+	ebookFlag := flag.Bool("ebook-friendly", false, "Save chapters as image folders, comatible with Kindle Comic Converter (no pdf output)")
 
 	keepImagesFlag := flag.Bool("keep-images", false, "Keep images after PDF creation")
 	keepImagesShort := flag.Bool("k", false, "Shorthand for --keep-images")
@@ -70,6 +73,7 @@ func ParseFlags() Options {
 	keepImages := *keepImagesFlag || *keepImagesShort
 	domain := customDomain
 	debug := *debugFlag
+	ebook := *ebookFlag
 
 	// Normalize domain (remove trailing slash, ensure https://)
 	if domain != "" {
@@ -146,13 +150,14 @@ func ParseFlags() Options {
 	}
 
 	return Options{
-		Slug:         slug,
-		All:          all,
-		Range:        chapterRange,
-		ScanDir:      dir,
-		RangeMode:    rangeMode,
-		Cleanup:      !keepImages,
-		CustomDomain: domain,
-		Debug:        debug,
+		Slug:          slug,
+		All:           all,
+		Range:         chapterRange,
+		ScanDir:       dir,
+		RangeMode:     rangeMode,
+		Cleanup:       !keepImages,
+		CustomDomain:  domain,
+		Debug:         debug,
+		EbookFriendly: ebook,
 	}
 }
