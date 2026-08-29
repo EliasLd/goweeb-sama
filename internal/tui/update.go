@@ -120,7 +120,7 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			return m, nil
 
 		case "down", "tab":
-			if m.Cursor < 6 {
+			if m.Cursor < 7 {
 				m.Cursor++
 			}
 			m = updateFocus(m)
@@ -138,6 +138,8 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			case 1:
 				m.AllCheckbox.Toggle()
 			case 5:
+				m.EbookCheckbox.Toggle()
+			case 6:
 				m.KeepCheckbox.Toggle()
 			}
 			return m, nil
@@ -146,9 +148,11 @@ func Update(msg tea.Msg, m Model) (Model, tea.Cmd) {
 			switch m.Cursor {
 			case 1: // AllCheckbox
 				m.AllCheckbox.Toggle()
-			case 5: // KeepCheckbox
+			case 5:
+				m.EbookCheckbox.Toggle()
+			case 6: // KeepCheckbox
 				m.KeepCheckbox.Toggle()
-			case 6: // Download button
+			case 7: // Download button
 				if m.DownloadReady {
 					// Start catalog search
 					m.Logs = append(m.Logs, fmt.Sprintf("Searching for: %s", m.MangaInput.Value()))
@@ -289,13 +293,14 @@ func startDownload(m Model) tea.Cmd {
 	return func() tea.Msg {
 		// Build download options
 		opts := app.Options{
-			Slug:         m.MangaInput.Value(),
-			All:          m.AllCheckbox.Checked,
-			ScanDir:      m.ScanDirInput.Value(),
-			Cleanup:      !m.KeepCheckbox.Checked,
-			CustomDomain: strings.TrimSpace(m.DomainInput.Value()),
-			MangaURL:     m.SelectedMangaURL,
-			ScanPath:     m.SelectedScanPath,
+			Slug:          m.MangaInput.Value(),
+			All:           m.AllCheckbox.Checked,
+			ScanDir:       m.ScanDirInput.Value(),
+			Cleanup:       !m.KeepCheckbox.Checked,
+			CustomDomain:  strings.TrimSpace(m.DomainInput.Value()),
+			MangaURL:      m.SelectedMangaURL,
+			ScanPath:      m.SelectedScanPath,
+			EbookFriendly: m.EbookCheckbox.Checked,
 		}
 
 		if !opts.All {
