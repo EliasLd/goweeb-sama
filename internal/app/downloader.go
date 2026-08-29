@@ -5,12 +5,21 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/EliasLd/scan-scraper/internal/convert"
 	"github.com/EliasLd/scan-scraper/internal/fetch"
 	"github.com/EliasLd/scan-scraper/internal/logger"
 	"github.com/EliasLd/scan-scraper/internal/scraper"
 )
+
+func chapterDigits(maxChapter int) int {
+	d := len(fmt.Sprintf("%d", maxChapter))
+	if d < 3 {
+		return 3
+	}
+	return d
+}
 
 func Run(opts Options, log *logger.Logger) {
 	if !opts.All && opts.RangeMode == 0 {
@@ -65,10 +74,15 @@ func Run(opts Options, log *logger.Logger) {
 	log.Debug("activeDomain = %q\n", activeDomain)
 	log.Debug("scanPath     = %q\n", scanPath)
 
-	siteURL, err := url.Parse(activeDomain)
+	mangaBase, err := url.Parse(mangaURL)
 	if err != nil {
-		log.Error("Invalid domain: %v\n", err)
+		log.Error("Invalid manga URL: %v\n", err)
 		return
+	}
+
+	// important pour résolution relative correcte
+	if !strings.HasSuffix(mangaBase.Path, "/") {
+		mangaBase.Path += "/"
 	}
 
 	scanRef, err := url.Parse(scanPath)
@@ -79,7 +93,8 @@ func Run(opts Options, log *logger.Logger) {
 
 	log.Debug("scanRef = %#v\n", scanRef)
 
-	scanPageURL := siteURL.ResolveReference(scanRef).String()
+	scanPageURL := mangaBase.ResolveReference(scanRef).String()
+	log.Debug("scanPageURL = %s\n", scanPageURL)
 
 	log.Debug("scanPageURL = %s\n", scanPageURL)
 
@@ -141,12 +156,36 @@ func Run(opts Options, log *logger.Logger) {
 	// Build base URL with the EXACT manga name
 	baseURL := fmt.Sprintf("%s/s2/scans/%s", activeDomain, scanInfo.MangaName)
 
+	maxChapter := chapters[len(chapters)-1]
+	digits := chapterDigits(maxChapter)
+
+	if opts.EbookFriendly {
+		if err := os.MkdirAll(opts.ScanDir, os.ModePerm); err != nil {
+			log.Error("Failed to create output dir: %v\n", err)
+			return
+		}
+	}
+
 	// Download each chapter
 	for _, chNum := range chapters {
 		chStr := fmt.Sprintf("%d", chNum)
 		log.Info("Downloading chapter %s...\n", chStr)
 
 		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chStr)
+
+		if opts.EbookFriendly {
+			chapterFolderName := fmt.Sprintf("Chapter %0*d", digits, chNum)
+			chapterDir := filepath.Join(opts.ScanDir, chapterFolderName)
+
+			err = fetch.DownloadChapterFromBaseURL(baseURL, chStr, chapterDir, log)
+			if err != nil {
+				log.Error("Failed to download chapter %s: %v\n", chStr, err)
+				continue
+			}
+
+			log.Info("Chapter %s saved to %s\n", chStr, chapterDir)
+			continue
+		}
 
 		// Use the exact base URL
 		err = fetch.DownloadChapterFromBaseURL(baseURL, chStr, imageDir, log)
@@ -174,7 +213,7 @@ func Run(opts Options, log *logger.Logger) {
 	}
 
 	// Cleanup
-	if opts.Cleanup {
+	if opts.Cleanup && !opts.EbookFriendly {
 		rootImagesDir := filepath.Join(homeDir, "Images", opts.Slug)
 		log.Debug("Cleaning up: %s\n", rootImagesDir)
 		os.RemoveAll(rootImagesDir)
