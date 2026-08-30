@@ -76,12 +76,15 @@ func viewForm(m Model) string {
 	}
 	form.WriteString("\n\n")
 
-	form.WriteString(m.KeepCheckbox.View(m.Cursor == 5))
+	form.WriteString(m.EbookCheckbox.View(m.Cursor == 5))
+	form.WriteString("\n\n")
+
+	form.WriteString(m.KeepCheckbox.View(m.Cursor == 6))
 	form.WriteString("\n\n")
 
 	if m.DownloadReady {
 		button := "[ Télécharger ]"
-		if m.Cursor == 6 {
+		if m.Cursor == 7 {
 			button = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("226")).Render(button)
 		} else {
 			button = lipgloss.NewStyle().Faint(true).Render(button)

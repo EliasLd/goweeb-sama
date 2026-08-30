@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,16 +27,13 @@ type ScanPathResult struct {
 func GetAllScanPaths(mangaURL string, log *logger.Logger) ([]ScanPathResult, error) {
 	log.Debug("Fetching scan path from: %s\n", mangaURL)
 
-	client := &http.Client{
-		Timeout: 15 * time.Second,
-	}
-
+	client := &http.Client{Timeout: 15 * time.Second}
 	req, err := http.NewRequest("GET", mangaURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
 	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -51,41 +49,81 @@ func GetAllScanPaths(mangaURL string, log *logger.Logger) ([]ScanPathResult, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to read manga page: %w", err)
 	}
-
 	html := string(body)
 
+	var results []ScanPathResult
+	seen := map[string]struct{}{}
+
+	// DOM parsing: <a href="...scan/...">
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse manga page: %w", err)
+	if err == nil {
+		doc.Find("a[href]").Each(func(i int, link *goquery.Selection) {
+			href, ok := link.Attr("href")
+			if !ok {
+				return
+			}
+			h := strings.TrimSpace(strings.ToLower(href))
+			if !(strings.Contains(h, "/scan/") || strings.HasPrefix(h, "scan/")) {
+				return
+			}
+			if _, exists := seen[href]; exists {
+				return
+			}
+			seen[href] = struct{}{}
+
+			label := strings.TrimSpace(link.Text())
+			if label == "" {
+				label = href
+			}
+
+			results = append(results, ScanPathResult{
+				Label: label,
+				Path:  href,
+			})
+		})
 	}
 
-	var results []ScanPathResult
+	// Fallback: parse panneauScan("Label","path")
+	if len(results) == 0 {
+		// capture: panneauScan("Scans", "scan/vf")
+		// groups: [1]=label, [2]=path
+		re := regexp.MustCompile(`panneauScan\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']\s*\)`)
+		matches := re.FindAllStringSubmatch(html, -1)
 
-	doc.Find(`a[href*="/scan/"]`).Each(func(i int, link *goquery.Selection) {
+		for _, m := range matches {
+			if len(m) < 3 {
+				continue
+			}
 
-		href, ok := link.Attr("href")
-		if !ok {
-			return
+			label := strings.TrimSpace(m[1])
+			path := strings.TrimSpace(m[2])
+
+			p := strings.ToLower(path)
+			if !(strings.Contains(p, "/scan/") || strings.HasPrefix(p, "scan/")) {
+				continue
+			}
+
+			if _, exists := seen[path]; exists {
+				continue
+			}
+			seen[path] = struct{}{}
+
+			if label == "" {
+				label = path
+			}
+
+			results = append(results, ScanPathResult{
+				Label: label,
+				Path:  path,
+			})
 		}
-
-		label := strings.TrimSpace(link.Text())
-
-		if label == "" {
-			label = href
-		}
-
-		results = append(results, ScanPathResult{
-			Label: label,
-			Path:  href,
-		})
-	})
+	}
 
 	if len(results) == 0 {
 		return nil, fmt.Errorf("no scan paths found")
 	}
 
 	log.Info("Found %d scan option(s)\n", len(results))
-
 	return results, nil
 }
 

@@ -35,13 +35,14 @@ const (
 type Model struct {
 	State AppState
 
-	Title        string
-	MangaInput   textinput.Model
-	AllCheckbox  Checkbox
-	RangeInput   textinput.Model
-	ScanDirInput textinput.Model
-	KeepCheckbox Checkbox
-	DomainInput  textinput.Model
+	Title         string
+	MangaInput    textinput.Model
+	AllCheckbox   Checkbox
+	RangeInput    textinput.Model
+	ScanDirInput  textinput.Model
+	KeepCheckbox  Checkbox
+	EbookCheckbox Checkbox
+	DomainInput   textinput.Model
 
 	Cursor        int
 	Width         int
@@ -103,6 +104,7 @@ func InitialModel() Model {
 		RangeInput:    rangeInput,
 		ScanDirInput:  scanDir,
 		DomainInput:   domain,
+		EbookCheckbox: Checkbox{Label: "Mode ebook-friendly (dossiers Chapter XXX pour KCC, sans PDF).", Checked: false},
 		KeepCheckbox:  Checkbox{Label: "Garder les images après conversion (déconseillé).", Checked: false},
 		Cursor:        0,
 		Width:         0,
