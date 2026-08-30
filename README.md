@@ -225,6 +225,8 @@ goweeb [options] "manga-name"
 | `--scan-dir <folder>` | `-d` | Folder to save PDF files (default: `pdf`) |
 | `--keep-images` | `-k` | Keep images after PDF creation |
 | `--domain <url>` | `-u` | Override anime-sama domain (e.g., `https://anime-sama.tv`) |
+| `--ebook-friendly ` | none | Download chapters as images in separated subfolders (e.g. Chapter 001/, Chapter 002/). Compatible with [Kindle Comic Converter](https://github.com/ciromattia/kcc). |
+| `--debug ` | none | Enable debug mode to display more logs (CLI only) |
 
 ### Usage examples
 
@@ -260,6 +262,19 @@ goweeb --scan-dir ~/Documents/Mangas -r 1-100 "one piece"
 ```bash
 # If the anime-sama domain changes
 goweeb -u https://anime-sama.fr --all "one piece"
+```
+
+#### Download as an e-reader friendly structure
+
+> [!WARNING]
+> It's not about downloading in EPUB format, but rather downloading manga
+> following a certain structure used by third party softwares to format manga for e-ink readers.
+
+For example, this mode is very usedful when it comes to convert the downloaded manga with [Kindle Comic Converter](https://github.com/ciromattia/kcc)
+and then upload it to your kindle, kobo or other e-reader.
+
+```bash
+goweeb -u https://anime-sama.fr --all --ebook-friendly "one piece"
 ```
 
 #### Combining options
