@@ -1,18 +1,15 @@
-package scraper
+package animesamascraper
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/EliasLd/scan-scraper/internal/logger"
-
+	"github.com/EliasLd/scan-scraper/internal/source/common"
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -23,7 +20,7 @@ type ScanPathResult struct {
 
 // Fetches the manga page, extracts all available scan paths
 // from panneauScan() function calls.
-// Returns the path(s) (e.g., "scan/vf", "scan/va", "Scans (couleur)", etc...")
+// Returns the path(s) (e.g., "scan/vf", "scan/va", "Scans (couleur)", etc...)
 func GetAllScanPaths(mangaURL string, log *logger.Logger) ([]ScanPathResult, error) {
 	log.Debug("Fetching scan path from: %s\n", mangaURL)
 
@@ -85,8 +82,6 @@ func GetAllScanPaths(mangaURL string, log *logger.Logger) ([]ScanPathResult, err
 
 	// Fallback: parse panneauScan("Label","path")
 	if len(results) == 0 {
-		// capture: panneauScan("Scans", "scan/vf")
-		// groups: [1]=label, [2]=path
 		re := regexp.MustCompile(`panneauScan\(\s*["']([^"']+)["']\s*,\s*["']([^"']+)["']\s*\)`)
 		matches := re.FindAllStringSubmatch(html, -1)
 
@@ -99,7 +94,7 @@ func GetAllScanPaths(mangaURL string, log *logger.Logger) ([]ScanPathResult, err
 			path := strings.TrimSpace(m[2])
 
 			p := strings.ToLower(path)
-			if !(strings.Contains(p, "/scan/") || strings.HasPrefix(p, "scan/")) {
+			if !(strings.Contains(p, "/scan/") || strings.HasPrefix(p, "scan")) {
 				continue
 			}
 
@@ -129,63 +124,15 @@ func GetAllScanPaths(mangaURL string, log *logger.Logger) ([]ScanPathResult, err
 
 // Displays scan options and asks user to choose
 func PromptUserToSelectScanPath(scanPaths []ScanPathResult, log *logger.Logger) (string, error) {
-	if len(scanPaths) == 0 {
-		return "", fmt.Errorf("no scan paths to choose from")
+	items := make([]common.SelectableItem, 0, len(scanPaths))
+	for _, sp := range scanPaths {
+		items = append(items, common.SelectableItem{Label: sp.Label, Value: sp.Path})
 	}
 
-	if len(scanPaths) == 1 {
-		log.Debug("Only one scan option: %s\n", scanPaths[0].Label)
-		log.Debug("Auto-selecting: %s\n", scanPaths[0].Path)
-		return scanPaths[0].Path, nil
-	}
-
-	// Display all options
-	log.Info("\nMultiple scan versions found:\n")
-	for i, sp := range scanPaths {
-		log.Info(" [%d] - %s\n", i+1, sp.Label)
-	}
-	log.Info("")
-
-	// Prompt user
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		log.Info("Select a scan version (1-%d) or 0 to cancel: ", len(scanPaths))
-
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return "", fmt.Errorf("failed to read input: %w", err)
-		}
-
-		input = strings.TrimSpace(input)
-
-		choice, err := strconv.Atoi(input)
-		if err != nil {
-			log.Warn("Invalid input. Please enter a number")
-			continue
-		}
-
-		if choice == 0 {
-			log.Warn("Selection cancelled by user")
-			return "", nil
-		}
-
-		if choice < 1 || choice > len(scanPaths) {
-			log.Warn("Invalid choice. Please enter a number between 1 and %d.\n", len(scanPaths))
-			continue
-		}
-
-		selected := scanPaths[choice-1]
-		log.Debug("Selected: %s\n", selected.Label)
-		log.Debug("Path: %s\n", selected.Path)
-		return selected.Path, nil
-	}
-}
-
-// Removes extra spaces and normalizes slashes
-func CleanURL(baseURL, path string) string {
-	baseURL = strings.TrimSpace(baseURL)
-	baseURL = strings.TrimSuffix(baseURL, "/")
-	path = strings.TrimPrefix(path, "/")
-	path = strings.TrimSuffix(path, "/")
-	return baseURL + "/" + path + "/"
+	return common.PromptUserToSelect(
+		items,
+		"Multiple scan versions found:",
+		"Select a scan version (1-%d) or 0 to cancel: ",
+		log,
+	)
 }
