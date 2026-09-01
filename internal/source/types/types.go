@@ -1,6 +1,9 @@
 package types
 
-import "github.com/EliasLd/scan-scraper/internal/logger"
+import (
+	"github.com/EliasLd/scan-scraper/internal/logger"
+	"github.com/EliasLd/scan-scraper/internal/source/common"
+)
 
 type ItemKind int
 
@@ -28,6 +31,13 @@ type Work struct {
 type Provider interface {
 	Name() string
 	Search(query string, log *logger.Logger) ([]SearchResult, error)
-	ListEntries(workURL string, log *logger.Logger) (Work, []Entry, error)
+
+	// Returns scan versions when the source exposes them (e.g. anime-sama).
+	// For sources without variants, return one implicit default item.
+	ListScanPaths(workURL string, log *logger.Logger) ([]common.SelectableItem, error)
+
+	// Returns chapters/volumes using the selected scan path (if any).
+	ListEntries(workURL string, scanPath string, log *logger.Logger) (Work, []Entry, error)
+
 	GetPageImageURLs(entryURL string, log *logger.Logger) ([]string, error)
 }
