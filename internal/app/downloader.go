@@ -2,15 +2,15 @@ package app
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/EliasLd/scan-scraper/internal/convert"
 	"github.com/EliasLd/scan-scraper/internal/fetch"
 	"github.com/EliasLd/scan-scraper/internal/logger"
-	"github.com/EliasLd/scan-scraper/internal/scraper"
+	"github.com/EliasLd/scan-scraper/internal/source"
+	"github.com/EliasLd/scan-scraper/internal/source/common"
+	sourcetypes "github.com/EliasLd/scan-scraper/internal/source/types"
 )
 
 func chapterDigits(maxChapter int) int {
@@ -21,347 +21,239 @@ func chapterDigits(maxChapter int) int {
 	return d
 }
 
+func toSelectableManga(in []sourcetypes.SearchResult) []common.SelectableItem {
+	out := make([]common.SelectableItem, 0, len(in))
+	for _, r := range in {
+		out = append(out, common.SelectableItem{
+			Label: r.Title,
+			Value: r.URL,
+		})
+	}
+	return out
+}
+
+// Filters entries based on user options.
+func filterEntries(entries []sourcetypes.Entry, opts Options, log *logger.Logger) []sourcetypes.Entry {
+	if opts.RangeMode == RangeLastN {
+		n := min(opts.Range[1], len(entries))
+		entries = entries[len(entries)-n:]
+		log.Info("Filtered to the last %d chapters\n", n)
+	} else if opts.Range != [2]int{} {
+		var filtered []sourcetypes.Entry
+		for _, e := range entries {
+			if opts.RangeMode == RangeOpenEnded && opts.Range[1] == 0 {
+				if e.Number >= opts.Range[0] {
+					filtered = append(filtered, e)
+				}
+			} else {
+				if e.Number >= opts.Range[0] && e.Number <= opts.Range[1] {
+					filtered = append(filtered, e)
+				}
+			}
+		}
+		entries = filtered
+		if opts.RangeMode == RangeOpenEnded {
+			log.Info("Filtered to %d chapters from %d onwards\n", len(entries), opts.Range[0])
+		} else {
+			log.Info("Filtered to %d chapters (%d-%d)\n", len(entries), opts.Range[0], opts.Range[1])
+		}
+	}
+	return entries
+}
+
+func downloadEntries(
+	provider sourcetypes.Provider,
+	work sourcetypes.Work,
+	entries []sourcetypes.Entry,
+	opts Options,
+	log *logger.Logger,
+) {
+	log.Info("Downloading %d chapters...\n", len(entries))
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Error("Failed to get home dir: %v\n", err)
+		return
+	}
+
+	maxNum := entries[len(entries)-1].Number
+	digits := chapterDigits(maxNum)
+
+	if opts.EbookFriendly {
+		if err := os.MkdirAll(opts.ScanDir, os.ModePerm); err != nil {
+			log.Error("Failed to create output dir: %v\n", err)
+			return
+		}
+	}
+
+	for _, entry := range entries {
+		chStr := fmt.Sprintf("%d", entry.Number)
+		log.Info("Downloading %s...\n", entry.Label)
+
+		imageURLs, err := provider.GetPageImageURLs(entry.URL, log)
+		if err != nil {
+			log.Error("Failed to collect image URLs for %s: %v\n", entry.Label, err)
+			continue
+		}
+		if len(imageURLs) == 0 {
+			log.Error("No image URLs found for %s\n", entry.Label)
+			continue
+		}
+
+		if opts.EbookFriendly {
+			prefix := "Chapter"
+			if work.Kind == sourcetypes.ItemVolume {
+				prefix = "Volume"
+			}
+
+			entryDir := filepath.Join(opts.ScanDir, fmt.Sprintf("%s %0*d", prefix, digits, entry.Number))
+			if err := fetch.DownloadImages(imageURLs, entryDir, log); err != nil {
+				log.Error("Failed to download %s: %v\n", entry.Label, err)
+				continue
+			}
+
+			log.Info("%s saved to %s\n", entry.Label, entryDir)
+			continue
+		}
+
+		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chStr)
+		if err := fetch.DownloadImages(imageURLs, imageDir, log); err != nil {
+			log.Error("Failed to download %s: %v\n", entry.Label, err)
+			continue
+		}
+
+		if err := os.MkdirAll(opts.ScanDir, os.ModePerm); err != nil {
+			log.Error("Failed to create output dir: %v\n", err)
+			return
+		}
+
+		pdfPath := filepath.Join(opts.ScanDir, fmt.Sprintf("%s_%s.pdf", work.Title, chStr))
+		if err := convert.ImagesToPDF(imageDir, pdfPath, opts.Cleanup, log); err != nil {
+			log.Error("Failed to create PDF: %v\n", err)
+			continue
+		}
+
+		log.Info("%s saved as %s\n", entry.Label, pdfPath)
+	}
+
+	if opts.Cleanup && !opts.EbookFriendly {
+		rootImagesDir := filepath.Join(homeDir, "Images", opts.Slug)
+		log.Debug("Cleaning up: %s\n", rootImagesDir)
+		_ = os.RemoveAll(rootImagesDir)
+	}
+}
+
 func Run(opts Options, log *logger.Logger) {
 	if !opts.All && opts.RangeMode == 0 {
 		log.Warn("Please use --all or --range to download chapters.")
 		return
 	}
 
-	// Get active domain
-	activeDomain := fetch.GetActiveDomain(opts.CustomDomain, log)
+	provider, err := source.New(opts.Source, opts.CustomDomain)
+	if err != nil {
+		log.Error("Failed to initialize source provider: %v\n", err)
+		return
+	}
 
 	log.Info("Searching for manga: %s\n", opts.Slug)
 
-	results, err := scraper.SearchCatalog(activeDomain, opts.Slug, log)
+	searchResults, err := provider.Search(opts.Slug, log)
 	if err != nil {
 		log.Error("Failed to search catalog: %v\n", err)
 		return
 	}
-
-	if len(results) == 0 {
+	if len(searchResults) == 0 {
 		log.Error("Manga '%s' not found in catalog\n", opts.Slug)
 		return
 	}
 
-	mangaURL, err := scraper.PromptUserToSelectManga(results, log)
+	mangaURL, err := common.PromptUserToSelect(
+		toSelectableManga(searchResults),
+		"Multiple results found:",
+		"Select a manga (1-%d) or 0 to cancel: ",
+		log,
+	)
 	if err != nil {
 		log.Error("Failed to select manga: %v\n", err)
 		return
 	}
-
 	if mangaURL == "" {
 		log.Warn("No manga selected. Exiting.")
 		return
 	}
 
-	scanPaths, err := scraper.GetAllScanPaths(mangaURL, log)
+	scanPaths, err := provider.ListScanPaths(mangaURL, log)
 	if err != nil {
-		log.Error("Failed to get scan paths: %v\n", err)
+		log.Error("Failed to list scan paths: %v\n", err)
+		return
+	}
+	if len(scanPaths) == 0 {
+		log.Warn("No scan versions found.")
 		return
 	}
 
-	scanPath, err := scraper.PromptUserToSelectScanPath(scanPaths, log)
+	scanPath, err := common.PromptUserToSelect(
+		scanPaths,
+		"Multiple scan versions found:",
+		"Select a scan version (1-%d) or 0 to cancel: ",
+		log,
+	)
 	if err != nil {
 		log.Error("Failed to select scan path: %v\n", err)
 		return
 	}
-
 	if scanPath == "" {
 		log.Warn("No scan version selected. Exiting.")
 		return
 	}
 
-	log.Debug("activeDomain = %q\n", activeDomain)
-	log.Debug("scanPath     = %q\n", scanPath)
-
-	mangaBase, err := url.Parse(mangaURL)
+	work, entries, err := provider.ListEntries(mangaURL, scanPath, log)
 	if err != nil {
-		log.Error("Invalid manga URL: %v\n", err)
+		log.Error("Failed to list entries: %v\n", err)
+		return
+	}
+	if len(entries) == 0 {
+		log.Warn("No entries found.")
 		return
 	}
 
-	// important pour résolution relative correcte
-	if !strings.HasSuffix(mangaBase.Path, "/") {
-		mangaBase.Path += "/"
-	}
-
-	scanRef, err := url.Parse(scanPath)
-	if err != nil {
-		log.Error("Invalid scan path: %v\n", err)
-		return
-	}
-
-	log.Debug("scanRef = %#v\n", scanRef)
-
-	scanPageURL := mangaBase.ResolveReference(scanRef).String()
-	log.Debug("scanPageURL = %s\n", scanPageURL)
-
-	log.Debug("scanPageURL = %s\n", scanPageURL)
-
-	mangaName, err := scraper.ExtractMangaName(scanPageURL, log)
-	if err != nil {
-		log.Error("Failed to extract manga name: %v\n", err)
-		return
-	}
-
-	scanInfo, err := scraper.GetScanInfo(activeDomain, mangaName, log)
-	if err != nil {
-		log.Error("Failed to get scan info: %v\n", err)
-		return
-	}
-
-	// Filter chapters based on user's range
-	chapters := scanInfo.Chapters
-
-	if opts.RangeMode == RangeLastN {
-		n := min(opts.Range[1], len(chapters))
-		chapters = chapters[len(chapters)-n:]
-		log.Info("Filtered to the last %d chapters\n", n)
-	} else if opts.Range != [2]int{} {
-		var filtered []int
-		for _, ch := range chapters {
-			if opts.RangeMode == RangeOpenEnded && opts.Range[1] == 0 {
-				// Open-ended range (e.g., 10-)
-				if ch >= opts.Range[0] {
-					filtered = append(filtered, ch)
-				}
-			} else {
-				// Closed range (e.g., 1-5)
-				if ch >= opts.Range[0] && ch <= opts.Range[1] {
-					filtered = append(filtered, ch)
-				}
-			}
-		}
-		chapters = filtered
-		if opts.RangeMode == RangeOpenEnded {
-			log.Info("Filtered to %d chapters from %d onwards\n", len(chapters), opts.Range[0])
-		} else {
-			log.Info("Filtered to %d chapters (%d-%d)\n", len(chapters), opts.Range[0], opts.Range[1])
-		}
-	}
-
-	if len(chapters) == 0 {
+	entries = filterEntries(entries, opts, log)
+	if len(entries) == 0 {
 		log.Warn("No chapters found in range.")
 		return
 	}
 
-	log.Info("Downloading %d chapters...\n", len(chapters))
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Error("Failed to get home dir: %v\n", err)
-		return
-	}
-
-	// Build base URL with the EXACT manga name
-	baseURL := fmt.Sprintf("%s/s2/scans/%s", activeDomain, scanInfo.MangaName)
-
-	maxChapter := chapters[len(chapters)-1]
-	digits := chapterDigits(maxChapter)
-
-	if opts.EbookFriendly {
-		if err := os.MkdirAll(opts.ScanDir, os.ModePerm); err != nil {
-			log.Error("Failed to create output dir: %v\n", err)
-			return
-		}
-	}
-
-	// Download each chapter
-	for _, chNum := range chapters {
-		chStr := fmt.Sprintf("%d", chNum)
-		log.Info("Downloading chapter %s...\n", chStr)
-
-		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chStr)
-
-		if opts.EbookFriendly {
-			chapterFolderName := fmt.Sprintf("Chapter %0*d", digits, chNum)
-			chapterDir := filepath.Join(opts.ScanDir, chapterFolderName)
-
-			err = fetch.DownloadChapterFromBaseURL(baseURL, chStr, chapterDir, log)
-			if err != nil {
-				log.Error("Failed to download chapter %s: %v\n", chStr, err)
-				continue
-			}
-
-			log.Info("Chapter %s saved to %s\n", chStr, chapterDir)
-			continue
-		}
-
-		// Use the exact base URL
-		err = fetch.DownloadChapterFromBaseURL(baseURL, chStr, imageDir, log)
-		if err != nil {
-			log.Error("Failed to download chapter %s: %v\n", chStr, err)
-			continue
-		}
-
-		// Create output directory
-		err = os.MkdirAll(opts.ScanDir, os.ModePerm)
-		if err != nil {
-			log.Error("Failed to create output dir: %v\n", err)
-			return
-		}
-
-		// Convert to PDF
-		pdfPath := filepath.Join(opts.ScanDir, fmt.Sprintf("%s_%s.pdf", mangaName, chStr))
-		err = convert.ImagesToPDF(imageDir, pdfPath, opts.Cleanup, log)
-		if err != nil {
-			log.Error("Failed to create PDF: %v\n", err)
-			continue
-		}
-
-		log.Info("Chapter %s saved as %s\n", chStr, pdfPath)
-	}
-
-	// Cleanup
-	if opts.Cleanup && !opts.EbookFriendly {
-		rootImagesDir := filepath.Join(homeDir, "Images", opts.Slug)
-		log.Debug("Cleaning up: %s\n", rootImagesDir)
-		os.RemoveAll(rootImagesDir)
-	}
+	downloadEntries(provider, work, entries, opts, log)
 }
 
-// Runs the download with pre-selected manga URL and scan path (used by TUI)
 func RunWithWorkflow(opts Options, log *logger.Logger) {
 	if !opts.All && opts.RangeMode == 0 {
 		log.Warn("Please enter a valid range to download chapters.")
 		return
 	}
 
-	activeDomain := fetch.GetActiveDomain(opts.CustomDomain, log)
-
-	// Resolve scan URL from selected manga URL (important for relative "scan/vf")
-	mangaBase, err := url.Parse(opts.MangaURL)
+	provider, err := source.New(opts.Source, opts.CustomDomain)
 	if err != nil {
-		log.Error("Invalid manga URL: %v\n", err)
-		return
-	}
-	if !strings.HasSuffix(mangaBase.Path, "/") {
-		mangaBase.Path += "/"
-	}
-
-	scanRef, err := url.Parse(opts.ScanPath)
-	if err != nil {
-		log.Error("Invalid scan path: %v\n", err)
+		log.Error("Failed to initialize source provider: %v\n", err)
 		return
 	}
 
-	scanPageURL := mangaBase.ResolveReference(scanRef).String()
-
-	mangaName, err := scraper.ExtractMangaName(scanPageURL, log)
+	work, entries, err := provider.ListEntries(opts.MangaURL, opts.ScanPath, log)
 	if err != nil {
-		log.Error("Failed to extract manga name: %v\n", err)
+		log.Error("Failed to list entries: %v\n", err)
+		return
+	}
+	if len(entries) == 0 {
+		log.Warn("No entries found.")
 		return
 	}
 
-	scanInfo, err := scraper.GetScanInfo(activeDomain, mangaName, log)
-	if err != nil {
-		log.Error("Failed to get scan info: %v\n", err)
-		return
-	}
-
-	chapters := scanInfo.Chapters
-
-	if opts.RangeMode == RangeLastN {
-		n := min(opts.Range[1], len(chapters))
-		chapters = chapters[len(chapters)-n:]
-		log.Info("Filtered to the last %d chapters\n", n)
-	} else if opts.Range != [2]int{} {
-		var filtered []int
-		for _, ch := range chapters {
-			if opts.RangeMode == RangeOpenEnded && opts.Range[1] == 0 {
-				if ch >= opts.Range[0] {
-					filtered = append(filtered, ch)
-				}
-			} else {
-				if ch >= opts.Range[0] && ch <= opts.Range[1] {
-					filtered = append(filtered, ch)
-				}
-			}
-		}
-		chapters = filtered
-		if opts.RangeMode == RangeOpenEnded {
-			log.Info("Filtered to %d chapters from %d onwards\n", len(chapters), opts.Range[0])
-		} else {
-			log.Info("Filtered to %d chapters (%d-%d)\n", len(chapters), opts.Range[0], opts.Range[1])
-		}
-	}
-
-	if len(chapters) == 0 {
+	entries = filterEntries(entries, opts, log)
+	if len(entries) == 0 {
 		log.Warn("No chapters found in range.")
 		return
 	}
 
-	log.Info("Downloading %d chapters...\n", len(chapters))
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Error("Failed to get home dir: %v\n", err)
-		return
-	}
-
-	baseURL := fmt.Sprintf("%s/s2/scans/%s", activeDomain, scanInfo.MangaName)
-
-	maxChapter := chapters[len(chapters)-1]
-	digits := len(fmt.Sprintf("%d", maxChapter))
-	if digits < 3 {
-		digits = 3
-	}
-
-	if opts.EbookFriendly {
-		if err := os.MkdirAll(opts.ScanDir, os.ModePerm); err != nil {
-			log.Error("Failed to create output dir: %v\n", err)
-			return
-		}
-	}
-
-	for _, chNum := range chapters {
-		chStr := fmt.Sprintf("%d", chNum)
-		log.Info("Downloading chapter %s...\n", chStr)
-
-		if opts.EbookFriendly {
-			chapterFolder := fmt.Sprintf("Chapter %0*d", digits, chNum)
-			chapterDir := filepath.Join(opts.ScanDir, chapterFolder)
-
-			err = fetch.DownloadChapterFromBaseURL(baseURL, chStr, chapterDir, log)
-			if err != nil {
-				log.Error("Failed to download chapter %s: %v\n", chStr, err)
-				continue
-			}
-
-			log.Info("Chapter %s saved to %s\n", chStr, chapterDir)
-			continue
-		}
-
-		// PDF mode
-		imageDir := filepath.Join(homeDir, "Images", opts.Slug, chStr)
-
-		err = fetch.DownloadChapterFromBaseURL(baseURL, chStr, imageDir, log)
-		if err != nil {
-			log.Error("Failed to download chapter %s: %v\n", chStr, err)
-			continue
-		}
-
-		err = os.MkdirAll(opts.ScanDir, os.ModePerm)
-		if err != nil {
-			log.Error("Failed to create output dir: %v\n", err)
-			return
-		}
-
-		pdfPath := filepath.Join(opts.ScanDir, fmt.Sprintf("%s_%s.pdf", mangaName, chStr))
-		err = convert.ImagesToPDF(imageDir, pdfPath, opts.Cleanup, log)
-		if err != nil {
-			log.Error("Failed to create PDF: %v\n", err)
-			continue
-		}
-
-		log.Info("Chapter %s saved as %s\n", chStr, pdfPath)
-	}
-
-	if opts.Cleanup && !opts.EbookFriendly {
-		rootImagesDir := filepath.Join(homeDir, "Images", opts.Slug)
-		log.Debug("Cleaning up: %s\n", rootImagesDir)
-		os.RemoveAll(rootImagesDir)
-	}
-
+	downloadEntries(provider, work, entries, opts, log)
 	log.Info("Finished downloading")
 }
