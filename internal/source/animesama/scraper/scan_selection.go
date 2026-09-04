@@ -60,7 +60,7 @@ func GetAllScanPaths(mangaURL string, log *logger.Logger) ([]ScanPathResult, err
 				return
 			}
 			h := strings.TrimSpace(strings.ToLower(href))
-			if !(strings.Contains(h, "/scan/") || strings.HasPrefix(h, "scan/")) {
+			if !(strings.Contains(h, "/scan/") || strings.HasPrefix(h, "scan")) {
 				return
 			}
 			if _, exists := seen[href]; exists {
