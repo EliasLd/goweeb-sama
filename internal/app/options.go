@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -17,6 +18,25 @@ const (
 	RangeLastN
 )
 
+var handledProviders = map[string]struct{}{
+	"animesama": {},
+	"sushiscan": {},
+}
+
+func isValidProvider(name string) bool {
+	_, ok := handledProviders[name]
+	return ok
+}
+
+func supportedProvidersList() string {
+	names := make([]string, 0, len(handledProviders))
+	for p := range handledProviders {
+		names = append(names, p)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
+}
+
 // Holds parsed CLI arguments
 type Options struct {
 	Slug          string
@@ -28,6 +48,7 @@ type Options struct {
 	CustomDomain  string // custom domain override
 	Debug         bool
 	EbookFriendly bool
+	Source        string
 
 	MangaURL string
 	ScanPath string
@@ -37,6 +58,8 @@ func ParseFlags() Options {
 	// Define flags
 	allFlag := flag.Bool("all", false, "Download all available chapters")
 	allShort := flag.Bool("a", false, "Shortand for --all)")
+
+	sourceFlag := flag.String("source", "animesama", "Source provider: animesama, sushiscan")
 
 	rangeFlag := flag.String("range", "", "Range of chapters to download, e.g., 10-77, 14-")
 	rangeShort := flag.String("r", "", "Shorthand for --range")
@@ -69,6 +92,14 @@ func ParseFlags() Options {
 
 	// Resolve final values
 	all := *allFlag || *allShort
+
+	source := strings.ToLower(strings.TrimSpace(*sourceFlag))
+	if !isValidProvider(source) {
+		fmt.Printf("Unsupported source provider: %q\n", source)
+		fmt.Printf("Supported providers: %s\n", supportedProvidersList())
+		os.Exit(1)
+	}
+
 	dir := scanDir
 	keepImages := *keepImagesFlag || *keepImagesShort
 	domain := customDomain
@@ -152,6 +183,7 @@ func ParseFlags() Options {
 	return Options{
 		Slug:          slug,
 		All:           all,
+		Source:        source,
 		Range:         chapterRange,
 		ScanDir:       dir,
 		RangeMode:     rangeMode,
